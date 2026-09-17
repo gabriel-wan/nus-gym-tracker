@@ -12,14 +12,25 @@ main = "src/index.ts"
 # cannot silently alter how this Worker behaves.
 compatibility_date = "2026-09-17"
 
-# Sample REBOKS every 15 minutes.
+# Sample REBOKS every 15 minutes, while the gyms are open.
+#
+# Cron Triggers execute on UTC time, and Singapore is UTC+8, so the window has
+# to be written shifted back 8 hours. The gyms open 07:00-22:00 SGT; we sample
+# 06:00-23:59 SGT, which is UTC hours 22-23 and 0-15:
+#
+#   22:00 UTC = 06:00 SGT   (an hour before opening)
+#   15:00 UTC = 23:00 SGT   (an hour after closing)
+#
+# The buffer is deliberate. It catches the opening and closing transitions, and
+# it means holiday or exam-period hour changes still get captured instead of
+# silently falling outside the window.
 #
 # Cloudflare does not guarantee a cron fires exactly on time, and runs can be
 # delayed or skipped, so rows are stamped with the observed time rather than
 # the scheduled time. See docs/architecture.md.
 # https://developers.cloudflare.com/workers/configuration/cron-triggers/
 [triggers]
-crons = ["*/15 * * * *"]
+crons = ["*/15 0-15,22-23 * * *"]
 
 # Stage 2. Create the database first:
 #

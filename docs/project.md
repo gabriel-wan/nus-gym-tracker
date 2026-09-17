@@ -78,6 +78,9 @@ writing to D1.
 | Store observed timestamp, not scheduled time | Cron Triggers are not guaranteed to fire on time, so the schedule is not a reliable clock. |
 | Store UTC | Unambiguous and immune to any future timezone handling mistakes; convert to SGT only for display. |
 | No ML yet | There is no historical data to train or evaluate on. |
+| Sample 06:00-23:59 SGT, not 24/7 | The gyms open 07:00-22:00 SGT, so overnight rows carry no information. An hour of buffer either side captures the opening/closing transitions and tolerates holiday hour changes. Cron Triggers run on UTC, so the window is written shifted back 8 hours. |
+| Serve `/gym` from D1, not a live scrape | With several users, scraping on every message would multiply load on a university server. Reading the latest stored row keeps REBOKS at a steady 4 requests/hour regardless of user count, and replies are instant. |
+| Design for multiple users from the start | The bot will be shared with a small group and may grow. `/gym` is stateless so it scales for free; `/alert` will need a per-user table later. Cheap to allow for now, annoying to retrofit. |
 | Track gyms only, not pools | This is a gym tracker. REBOKS publishes two pools; we parse them (that is what the `gymbox`/`swimbox` class is for) but do not store them, because unused rows are noise. Filtering on `kind` rather than a fixed ID list means a third gym would be picked up automatically. |
 | `wrangler.toml`, not `wrangler.jsonc` | Cloudflare recommends JSON for new projects, but TOML is fully supported and takes comments, which is worth more here than access to config-only features we do not use. |
 | Plain `vitest`, not `@cloudflare/vitest-pool-workers` | The parser is a pure function and needs no Workers runtime. The Workers test pool only becomes worthwhile when there are D1 bindings to test. |
@@ -105,6 +108,8 @@ Stage 5  Prediction experiments                 blocked on Stage 4
   verbatim, never present them as "empty".
 - **Compare percentages, not headcount.** The gyms have different capacities (120 vs
   110), so raw numbers are not comparable.
+- **Gym opening hours are 07:00-22:00 SGT, daily.** Readings outside those hours are
+  closure, not demand.
 - **Be a polite client.** One request per 15 minutes, honest User-Agent, no retry storms.
   REBOKS is a university service, not an API product.
 - **No secrets in the repository.** The Telegram bot token goes in Wrangler secrets.

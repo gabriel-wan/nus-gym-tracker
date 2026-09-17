@@ -6,6 +6,8 @@
 - [x] Scaffold the Worker project (config, src, tests)
 - [x] Port the scraper to TypeScript
 - [x] Decide whether to store pools as well as gyms (gyms only)
+- [x] Restrict the cron to gym opening hours (06:00-23:59 SGT)
+- [ ] Create a Cloudflare account, then `wrangler login`
 - [ ] Deploy the Worker and confirm the cron fires on Cloudflare
 
 ## Next
@@ -21,5 +23,5 @@
 ## Open questions
 - [x] Why did UTown read `0/120` all evening on 2026-09-17? Closed; reopens 18 Sep 2026
 - [ ] Are facility IDs stable over months?
-- [ ] How often does the upstream counter actually update?
+- [ ] How often does NUS's people-counter actually update? (affects whether 15 min is right)
 - [ ] Do the `facility/gymnumber` JSON endpoints ever come back? (re-test occasionally)

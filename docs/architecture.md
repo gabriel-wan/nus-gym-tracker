@@ -41,6 +41,16 @@ The Cron Trigger is what turns a one-off reading into a time series.
 15 minutes is the starting interval. It is frequent enough to capture how crowding rises
 and falls across an evening, and cheap enough to be irrelevant against any quota.
 
+The gyms open 07:00–22:00 SGT, so there is nothing to learn overnight — the cron runs
+06:00–23:59 SGT only, which is 72 samples a day instead of 96. The hour of buffer at
+each end is deliberate: it captures the opening and closing transitions, and it means a
+holiday or exam-period change to the hours still lands inside the window instead of
+silently falling outside it.
+
+Because Cron Triggers execute on **UTC**, that window is written shifted back 8 hours
+(`*/15 0-15,22-23 * * *`). Getting this wrong would silently sample the wrong half of
+the day, so `wrangler.toml` spells out the conversion.
+
 **Scheduled runs are not precise.** Cloudflare does not guarantee a cron fires at exactly
 `:00/:15/:30/:45`, and a run can be delayed or skipped. This is why the database stores
 the *observed* timestamp taken at scrape time rather than assuming a tidy grid — any
@@ -64,6 +74,12 @@ Worker with no extra account, connection string, or credentials to manage.
 
 The data is small and relational and the questions are aggregate ones ("average
 occupancy at Thursday 7pm"), which is exactly what SQL is good at.
+
+D1 also protects REBOKS once the bot has more than one user. If `/gym` scraped REBOKS on
+every message, ten people checking at 6pm would mean ten requests to a university server
+that owes us nothing. Serving `/gym` from the most recent stored row instead means
+REBOKS sees a steady 4 requests an hour no matter how many people use the bot — and
+users get an instant reply rather than waiting on a round trip to NUS.
 
 ### Telegram webhook (not long polling)
 
