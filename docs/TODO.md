@@ -17,7 +17,10 @@
 - [x] Write observations to D1 from `scheduled()`
 - [x] Telegram `/gym`
 - [x] Register the webhook with setWebhook
+- [x] Alert on collection failure
+- [x] Test the D1 and webhook layers in workerd
 - [ ] Set the bot avatar in @BotFather
+- [ ] Set ALERT_CHAT_ID so a broken collector is not silent
 
 ## Later
 - [ ] `/history` - recent trend, once a day of data exists

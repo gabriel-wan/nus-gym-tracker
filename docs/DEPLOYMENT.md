@@ -51,6 +51,16 @@ empty Worker to hold them. Saying yes is fine — the first real deploy fills it
 
 Neither value can be read back afterwards, only overwritten. Neither belongs in git.
 
+Optionally, a third — the chat to alert when a collection run fails:
+
+```bash
+npx wrangler secret put ALERT_CHAT_ID
+```
+
+Message [@userinfobot](https://t.me/userinfobot) on Telegram to find your own id. Leaving
+this unset simply disables alerting; nothing else changes. It is worth setting: without
+it, a broken collector is silent, and lost history cannot be recovered later.
+
 For local development the same two names go in `.dev.vars`, which is gitignored:
 
 ```
@@ -99,7 +109,9 @@ trying to deliver and failing.
 | Command | What it does |
 |---|---|
 | `npm run dev` | Worker locally, with a local D1 |
-| `npm test` | parser and message-formatting tests |
+| `npm test` | all tests |
+| `npx vitest run --project unit` | pure functions only, fast |
+| `npx vitest run --project worker` | D1 and webhook tests, inside workerd |
 | `npm run typecheck` | TypeScript, no emit |
 | `npm run deploy` | publish to Cloudflare |
 | `npx wrangler tail` | live logs from the deployed Worker |

@@ -3,8 +3,14 @@
     "target": "ES2022",
     "module": "ES2022",
     "moduleResolution": "Bundler",
-    "lib": ["ES2022"],
-    "types": ["@cloudflare/workers-types", "node"],
+    "lib": [
+      "ES2022"
+    ],
+    "types": [
+      "@cloudflare/workers-types",
+      "node",
+      "@cloudflare/vitest-pool-workers/types"
+    ],
     "strict": true,
     "noEmit": true,
     "isolatedModules": true,
@@ -12,5 +18,8 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts"
+  ]
 }
