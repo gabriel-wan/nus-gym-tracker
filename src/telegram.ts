@@ -84,17 +84,30 @@ function describeAge(minutes: number): string {
  * A zero gets a white circle rather than a green one. Green would read as
  * "wonderfully empty, go now", when 0 almost always means the gym is shut.
  */
-function gymBlock(reading: Reading): string {
+function gymBlock(reading: Reading, lagging: boolean): string {
   const pct = percentFull(reading);
+  const counts = `${reading.occupancy} / ${reading.capacity}`;
+  // A gym whose own reading is much older than the other's must say so here,
+  // because the single "Updated" line below cannot describe both honestly.
+  const suffix = lagging ? " · older reading" : "";
 
   if (reading.occupancy === 0) {
-    return `${gymName(reading)}\n⚪ ${reading.occupancy} / ${reading.capacity} · closed or empty`;
+    return `${gymName(reading)}\n⚪ ${counts} · closed or empty${suffix}`;
+  }
+
+  // capacity 0 would make a percentage meaningless rather than zero.
+  if (pct === null) {
+    return `${gymName(reading)}\n⚪ ${counts} · capacity unknown${suffix}`;
   }
 
   const icon =
-    pct === null ? "⚪" : pct >= BUSY_PERCENT ? "\u{1F534}" : pct >= MODERATE_PERCENT ? "\u{1F7E1}" : "\u{1F7E2}";
+    pct >= BUSY_PERCENT
+      ? "\u{1F534}"
+      : pct >= MODERATE_PERCENT
+        ? "\u{1F7E1}"
+        : "\u{1F7E2}";
 
-  return `${gymName(reading)}\n${icon} ${reading.occupancy} / ${reading.capacity} · ${pct?.toFixed(0)}% full`;
+  return `${gymName(reading)}\n${icon} ${counts} · ${pct.toFixed(0)}% full${suffix}`;
 }
 
 /**
@@ -133,6 +146,13 @@ export function formatGymMessage(readings: Reading[], now: Date): string {
     ].join("\n");
   }
 
+  // Each gym's row is fetched independently, so a failed insert can leave one
+  // gym fresh and the other hours old. Age everything by the OLDEST reading:
+  // understating freshness is safe, overstating it is the lie worth avoiding.
+  const ages = new Map(readings.map((r) => [r.facilityId, minutesAgo(r.collectedAt, now)]));
+  const oldest = Math.max(...ages.values());
+  const freshest = Math.min(...ages.values());
+
   // Quietest first: the whole point of the message is where to go.
   const ordered = [...readings].sort(
     (a, b) => (percentFull(a) ?? 0) - (percentFull(b) ?? 0),
@@ -140,13 +160,14 @@ export function formatGymMessage(readings: Reading[], now: Date): string {
 
   const lines = ["\u{1F3CB} NUS Gym Tracker", ""];
   for (const reading of ordered) {
-    lines.push(gymBlock(reading), "");
+    const lagging = (ages.get(reading.facilityId) ?? 0) - freshest > STALE_AFTER_MINUTES;
+    lines.push(gymBlock(reading, lagging), "");
   }
 
   const call = verdict(readings, now);
   if (call) lines.push(call);
 
-  const age = minutesAgo(readings[0].collectedAt, now);
+  const age = oldest;
   lines.push(describeAge(age));
 
   // Only suspect a stuck collector while the gyms are open. Overnight the cron
@@ -158,6 +179,24 @@ export function formatGymMessage(readings: Reading[], now: Date): string {
   lines.push("", "⚠ Counts come from entry scans and may read high. /about");
 
   return lines.join("\n").trim();
+}
+
+/**
+ * The message sent to the operator when a collection run fails.
+ *
+ * Deliberately blunt: this is the only thing standing between a broken
+ * collector and days of missing history nobody noticed.
+ */
+export function collectionFailedMessage(error: unknown, lastSuccess: string | null): string {
+  return [
+    "\u{1F6A8} NUS Gym Tracker: collection failed",
+    "",
+    String(error instanceof Error ? error.message : error).slice(0, 300),
+    "",
+    lastSuccess
+      ? `Last successful collection: ${lastSuccess}`
+      : "There has never been a successful collection.",
+  ].join("\n");
 }
 
 /** The reply to /start. */

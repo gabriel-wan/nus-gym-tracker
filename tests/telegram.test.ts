@@ -115,6 +115,39 @@ describe("formatGymMessage", () => {
     expect(formatGymMessage([usc(40)], EVENING)).toContain("may read high");
   });
 
+  // Regression: the age line used to come from one row and be applied to both,
+  // so a fresh gym beside a stale one was reported as if both were fresh.
+  it("ages by the oldest reading when the two gyms disagree", () => {
+    const message = formatGymMessage(
+      [utown(42, "2026-09-18T13:00:00Z"), usc(71, "2026-09-18T09:00:00Z")],
+      EVENING,
+    );
+
+    expect(message).toContain("about 4 hours ago");
+    expect(message).not.toContain("just now");
+    expect(message).toContain("older reading");
+  });
+
+  it("marks which gym is lagging, not just that something is old", () => {
+    const message = formatGymMessage(
+      [utown(42, "2026-09-18T13:00:00Z"), usc(71, "2026-09-18T09:00:00Z")],
+      EVENING,
+    );
+    const uscBlock = message.slice(message.indexOf("USC Gym"));
+
+    expect(uscBlock).toContain("older reading");
+    expect(message.slice(message.indexOf("UTown Gym"), message.indexOf("USC Gym")))
+      .not.toContain("older reading");
+  });
+
+  // Regression: capacity 0 rendered as "undefined% full".
+  it("says capacity unknown rather than undefined when capacity is 0", () => {
+    const message = formatGymMessage([reading(39, 5, 0)], EVENING);
+
+    expect(message).toContain("capacity unknown");
+    expect(message).not.toContain("undefined");
+  });
+
   it("explains an empty database instead of showing nothing", () => {
     expect(formatGymMessage([], EVENING)).toContain("No readings yet");
   });
