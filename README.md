@@ -93,14 +93,21 @@ docs/               why things are the way they are
 ## How it works
 
 ```
-REBOKS capacity page
-        |  scrape every 5 min
-        v
-Cloudflare Worker  -->  D1 (history)
-        ^                  |
-        |  webhook         v
-     Telegram  <--------  reply
+collecting          answering
+(a timer)           (a message)
+
+  REBOKS              you: /gym
+    ^                    |
+    | GET                v
+    |                 Telegram
+  Worker  ──────────> Worker ──> Telegram ──> you
+    |                    ^
+    v  INSERT            |  SELECT
+   D1  ─────────────────-+
 ```
+
+Two loops sharing one Worker and one database. `/gym` reads what the collector
+already stored, so it never touches NUS.
 
 The data source is a public, unauthenticated page. No NUS login is involved.
 

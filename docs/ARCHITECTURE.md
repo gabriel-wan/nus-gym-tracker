@@ -14,21 +14,40 @@ find out whether the data source is usable at all before committing to a stack.
 
 ## Target architecture
 
+Two independent flows. They share a Worker and a database, but never wait on each other.
+
+### Collecting — runs on a timer, nobody triggers it
+
 ```
-        REBOKS capacity page
-                 |
-                 |  HTTPS GET, every 5 minutes
-                 v
-   Cron Trigger --> Cloudflare Worker --> D1 (occupancy history)
-                          ^                     |
-                          |                     | SELECT latest
-        Telegram --POST-->|                     |
-        (webhook)         |<--------------------+
-                          |
-                          |  POST sendMessage
-                          v
-                     Telegram --> User
+   Cron Trigger  (every 5 min, 06:00-23:59 SGT)
+        |  wakes
+        v
+   Cloudflare Worker  ──── HTTPS GET ────>  REBOKS capacity page
+        |                                        |
+        |<──────────────── HTML ─────────────────+
+        |  parse, keep the two gyms
+        v
+   D1   one row per gym per scrape
 ```
+
+### Answering — runs when someone messages the bot
+
+```
+   User types /gym
+        |
+        v
+   Telegram  ──── POST (webhook) ────>  Cloudflare Worker
+                                             |  SELECT newest row per gym
+                                             v
+                                            D1
+                                             |  format the reply
+                                             v
+   User  <──── delivers ────  Telegram  <──── POST sendMessage
+```
+
+The only arrow that touches NUS is in the first diagram. `/gym` never reaches REBOKS —
+it reads what the collector already stored, so REBOKS sees the same 12 requests an hour
+whether one person uses the bot or a hundred.
 
 ## Why each component exists
 
