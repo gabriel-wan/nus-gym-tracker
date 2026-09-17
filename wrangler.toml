@@ -34,15 +34,20 @@ crons = ["*/15 0-15,22-23 * * *"]
 
 # Stage 2. Create the database first:
 #
+# Occupancy history.
+#
+# database_id below is a placeholder. Local development ignores it and keeps its
+# own SQLite file under .wrangler/, so everything can be built and tested with
+# no Cloudflare account. Before the first deploy, run:
+#
 #   npx wrangler d1 create nus-gym-tracker
 #
-# then paste the printed database_id below and uncomment. It is left commented
-# out because an invalid database_id breaks `wrangler dev`.
-#
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "nus-gym-tracker"
-# database_id = "<paste-from-wrangler-d1-create>"
+# and replace the placeholder with the id it prints. Only remote commands
+# (`--remote`, `deploy`) need the real value.
+[[d1_databases]]
+binding = "DB"
+database_name = "nus-gym-tracker"
+database_id = "local-placeholder-replace-before-deploy"
 
 # Stage 3. The Telegram bot token is a secret and never belongs in this file:
 #
