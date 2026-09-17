@@ -47,7 +47,7 @@ crons = ["*/15 0-15,22-23 * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "nus-gym-tracker"
-database_id = "local-placeholder-replace-before-deploy"
+database_id = "691e7584-34ca-464e-bf50-4e608928fc26"
 
 # Stage 3. The Telegram bot token is a secret and never belongs in this file:
 #
