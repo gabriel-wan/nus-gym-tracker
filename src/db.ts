@@ -75,3 +75,16 @@ export async function latestReadings(db: D1Database): Promise<Reading[]> {
   const { results } = await db.prepare(LATEST).all<Reading>();
   return results;
 }
+
+/**
+ * When the most recent reading was collected, or null if there are none.
+ *
+ * Used to decide whether a failure is newly broken or part of an outage we have
+ * already reported, without needing a second table to track alert state.
+ */
+export async function newestCollectedAt(db: D1Database): Promise<string | null> {
+  const row = await db
+    .prepare("SELECT MAX(collected_at) AS newest FROM occupancy")
+    .first<{ newest: string | null }>();
+  return row?.newest ?? null;
+}

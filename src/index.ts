@@ -6,10 +6,11 @@
  *   fetch()     - HTTP, later the Telegram webhook
  */
 
-import { insertObservations, latestReadings } from "./db";
+import { insertObservations, latestReadings, newestCollectedAt } from "./db";
 import { observe, percentFull } from "./reboks";
 import {
   aboutMessage,
+  collectionFailedMessage,
   formatGymMessage,
   helpMessage,
   parseCommand,
@@ -24,7 +25,20 @@ export interface Env {
   // Both set with `wrangler secret put`, never in the repo.
   TELEGRAM_BOT_TOKEN: string;
   TELEGRAM_WEBHOOK_SECRET: string;
+
+  // Optional: the chat to alert when collection fails. Send /start to the bot
+  // and read the chat id from `wrangler tail` to find yours.
+  ALERT_CHAT_ID?: string;
 }
+
+/**
+ * Don't re-alert during an ongoing outage.
+ *
+ * If the newest stored reading is already older than this, we have alerted for
+ * this outage once and staying quiet. Using the data we already have avoids a
+ * second table just to remember that we sent a message.
+ */
+const ALERT_IF_LAST_SUCCESS_WITHIN_MINUTES = 20;
 
 /** Where Telegram posts updates. Told to Telegram once, via setWebhook. */
 const WEBHOOK_PATH = "/telegram";
@@ -38,14 +52,19 @@ export default {
    * guarantee crons fire on schedule. See docs/ARCHITECTURE.md.
    */
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    const observations = await observe();
-    await insertObservations(env.DB, observations);
+    try {
+      const observations = await observe();
+      await insertObservations(env.DB, observations);
 
-    // One line per run, so a broken scrape is visible in `wrangler tail`.
-    console.log(
-      `stored ${observations.length} readings: ` +
-        observations.map((o) => `${o.name} ${o.occupancy}/${o.capacity}`).join(", "),
-    );
+      // One line per run, so a broken scrape is visible in `wrangler tail`.
+      console.log(
+        `stored ${observations.length} readings: ` +
+          observations.map((o) => `${o.name} ${o.occupancy}/${o.capacity}`).join(", "),
+      );
+    } catch (error) {
+      console.error(`collection failed: ${error}`);
+      await reportCollectionFailure(env, error);
+    }
   },
 
   /**
@@ -128,5 +147,42 @@ async function replyTo(command: string, env: Env): Promise<string | null> {
       return aboutMessage();
     default:
       return null;
+  }
+}
+
+/**
+ * Tell the operator that a collection run failed.
+ *
+ * Silent by design if ALERT_CHAT_ID is unset - alerting is opt-in, and a
+ * missing chat id must never turn one failure into two.
+ */
+async function reportCollectionFailure(env: Env, error: unknown): Promise<void> {
+  if (!env.ALERT_CHAT_ID) return;
+
+  try {
+    const lastSuccess = await newestCollectedAt(env.DB);
+
+    const minutesSinceSuccess =
+      lastSuccess === null
+        ? Infinity
+        : (Date.now() - Date.parse(lastSuccess)) / 60000;
+
+    // Alert on the first failure of an outage, and on the very first failure
+    // ever (when there is no successful run to compare against).
+    const firstFailureOfOutage =
+      lastSuccess === null ||
+      minutesSinceSuccess <= ALERT_IF_LAST_SUCCESS_WITHIN_MINUTES;
+
+    if (!firstFailureOfOutage) return;
+
+    await sendMessage(
+      env.TELEGRAM_BOT_TOKEN,
+      Number(env.ALERT_CHAT_ID),
+      collectionFailedMessage(error, lastSuccess),
+    );
+  } catch (alertError) {
+    // Never let the alert path throw: it runs inside the handler that just
+    // failed, and a crash here would hide the original error.
+    console.error(`failed to report failure: ${alertError}`);
   }
 }
