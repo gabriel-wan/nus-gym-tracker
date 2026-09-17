@@ -15,34 +15,67 @@ Currently tracking:
 
 ## Status
 
-**Stage 0 of 5 — the scraper works; nothing is deployed yet.**
+**Stage 1 in progress — the Worker runs locally; nothing is deployed yet.**
 
 ```
 [x] Stage 0  Investigate REBOKS, build scraper
-[ ] Stage 1  Cloudflare Worker
+[~] Stage 1  Cloudflare Worker  (scraper ported + tests; not deployed)
 [ ] Stage 2  D1 storage + 15-minute Cron Trigger
 [ ] Stage 3  Telegram /gym
 [ ] Stage 4  Historical analysis
 ```
 
-## Try it
+## Run it
 
-Requires Python 3 and `requests`:
+The Worker, locally:
+
+```bash
+npm install
+npm run dev
+```
+
+Then, in another terminal:
+
+```bash
+curl http://127.0.0.1:8787/health
+curl "http://127.0.0.1:8787/cdn-cgi/local/scheduled"
+```
+
+`/health` returns live occupancy as JSON. The second URL manually fires the cron
+handler, which is how Wrangler lets you test a scheduled run without waiting.
+
+The original Python prototype still works and remains the reference implementation:
 
 ```bash
 python prototype/scrape.py
 ```
 
-Example output:
-
 ```
-Observed at 2026-09-17 20:41:03 SGT
+Observed at 2026-09-17 21:08:10 SGT
 
-[ 41] Kent Ridge - Swimming Pool: 107/250 (43%)
-[ 25] University Town - Recreational swimming pool: 7/50 (14%)
-[ 39] University Sports Centre - Gym: 108/110 (98%)
+[ 41] Kent Ridge - Swimming Pool: 100/250 (40%)
+[ 25] University Town - Recreational swimming pool: 8/50 (16%)
+[ 39] University Sports Centre - Gym: 106/110 (96%)
 [ 26] University Town - Fitness gym: 0/120 (0%)
 ```
+
+## Layout
+
+```
+src/index.ts        Worker entry: scheduled() + fetch()
+src/reboks.ts       fetch + parse the REBOKS page
+tests/              parser tests against a real saved page
+migrations/         D1 schema (empty until Stage 2)
+prototype/          the original Python scraper
+docs/               why things are the way they are
+```
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Worker locally via Wrangler |
+| `npm test` | parser tests |
+| `npm run typecheck` | TypeScript, no emit |
+| `npm run deploy` | push to Cloudflare (needs an account) |
 
 ## How it works
 

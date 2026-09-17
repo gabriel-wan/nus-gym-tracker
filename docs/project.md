@@ -45,8 +45,13 @@ Everything else waits until there is data to justify it.
 
 - A local Python prototype that fetches the REBOKS capacity page and prints occupancy,
   capacity, facility ID and timestamp for all four published facilities.
+- A Cloudflare Worker skeleton with the scraper ported to TypeScript, a `/health`
+  endpoint returning live occupancy as JSON, and a `scheduled()` handler wired to a
+  15-minute cron. Both entry points run under `wrangler dev`.
+- Seven parser tests against a real saved REBOKS response.
 
-That is the whole implementation today. Nothing is deployed or stored.
+Nothing is deployed, and nothing is stored yet — `scheduled()` currently logs instead of
+writing to D1.
 
 ## Planned features
 
@@ -73,12 +78,16 @@ That is the whole implementation today. Nothing is deployed or stored.
 | Store observed timestamp, not scheduled time | Cron Triggers are not guaranteed to fire on time, so the schedule is not a reliable clock. |
 | Store UTC | Unambiguous and immune to any future timezone handling mistakes; convert to SGT only for display. |
 | No ML yet | There is no historical data to train or evaluate on. |
+| `wrangler.toml`, not `wrangler.jsonc` | Cloudflare recommends JSON for new projects, but TOML is fully supported and takes comments, which is worth more here than access to config-only features we do not use. |
+| Plain `vitest`, not `@cloudflare/vitest-pool-workers` | The parser is a pure function and needs no Workers runtime. The Workers test pool only becomes worthwhile when there are D1 bindings to test. |
+| Test against a real saved page | `tests/fixtures/capacity.html` is a genuine response, so the test fails if REBOKS changes its markup — handwritten HTML would only test our own assumptions. |
+| `@types/node` in `tsconfig.json` | The test reads the fixture from disk. Slight downside: TypeScript will no longer stop you importing a Node API into Worker code, though `wrangler dev` would fail loudly if you did. |
 
 ## Current implementation state
 
 ```
 Stage 0  Investigate REBOKS + build scraper     DONE
-Stage 1  Move scraper into a Cloudflare Worker  not started
+Stage 1  Move scraper into a Cloudflare Worker  IN PROGRESS - runs locally, not deployed
 Stage 2  D1 schema + scheduled collection       not started
 Stage 3  Telegram /gym                          not started
 Stage 4  Historical analysis                    blocked on data

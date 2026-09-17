@@ -1,0 +1,38 @@
+# Cloudflare Worker configuration.
+#
+# Cloudflare now recommends wrangler.jsonc for new projects, but wrangler.toml
+# remains fully supported and is easier to read with comments, which matters
+# more here than access to the newest config-only features.
+# https://developers.cloudflare.com/workers/wrangler/configuration/
+
+name = "nus-gym-tracker"
+main = "src/index.ts"
+
+# Pins the Workers runtime behaviour to this date, so a future runtime change
+# cannot silently alter how this Worker behaves.
+compatibility_date = "2026-09-17"
+
+# Sample REBOKS every 15 minutes.
+#
+# Cloudflare does not guarantee a cron fires exactly on time, and runs can be
+# delayed or skipped, so rows are stamped with the observed time rather than
+# the scheduled time. See docs/architecture.md.
+# https://developers.cloudflare.com/workers/configuration/cron-triggers/
+[triggers]
+crons = ["*/15 * * * *"]
+
+# Stage 2. Create the database first:
+#
+#   npx wrangler d1 create nus-gym-tracker
+#
+# then paste the printed database_id below and uncomment. It is left commented
+# out because an invalid database_id breaks `wrangler dev`.
+#
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "nus-gym-tracker"
+# database_id = "<paste-from-wrangler-d1-create>"
+
+# Stage 3. The Telegram bot token is a secret and never belongs in this file:
+#
+#   npx wrangler secret put TELEGRAM_BOT_TOKEN
