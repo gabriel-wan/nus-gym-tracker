@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  gymsOnly,
   parseFacilities,
   percentFull,
   USC_GYM_ID,
@@ -55,6 +56,15 @@ describe("parseFacilities", () => {
     expect(() => parseFacilities("<html><body>nothing here</body></html>")).toThrow(
       /layout has changed/,
     );
+  });
+});
+
+describe("gymsOnly", () => {
+  it("keeps both gyms and drops the pools", () => {
+    const gyms = gymsOnly(parseFacilities(html));
+
+    expect(gyms.map((g) => g.facilityId).sort()).toEqual([UTOWN_GYM_ID, USC_GYM_ID]);
+    expect(gyms.every((g) => g.kind === "gym")).toBe(true);
   });
 });
 

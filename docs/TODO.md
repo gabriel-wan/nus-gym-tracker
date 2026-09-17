@@ -5,7 +5,7 @@
 - [x] Build a local scraper prototype
 - [x] Scaffold the Worker project (config, src, tests)
 - [x] Port the scraper to TypeScript
-- [ ] Decide whether to store pools as well as gyms
+- [x] Decide whether to store pools as well as gyms (gyms only)
 - [ ] Deploy the Worker and confirm the cron fires on Cloudflare
 
 ## Next
@@ -19,7 +19,7 @@
 - [ ] Alerts
 
 ## Open questions
-- [ ] Why did UTown read `0/120` all evening on 2026-09-17? Closed, or broken counter?
+- [x] Why did UTown read `0/120` all evening on 2026-09-17? Closed; reopens 18 Sep 2026
 - [ ] Are facility IDs stable over months?
 - [ ] How often does the upstream counter actually update?
 - [ ] Do the `facility/gymnumber` JSON endpoints ever come back? (re-test occasionally)

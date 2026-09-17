@@ -11,7 +11,13 @@ export const CAPACITY_URL =
 /** Identify ourselves honestly rather than impersonating a browser. */
 const USER_AGENT = "nus-gym-tracker/0.1 (personal project; contact via GitHub)";
 
-/** The two gyms this project tracks. Pools are parsed too, but not the focus. */
+/**
+ * The two gyms this project tracks.
+ *
+ * REBOKS also publishes two swimming pools. We parse them, because telling gyms
+ * from pools is what `class` is for, but we do not track them: this is a gym
+ * tracker, and unused rows are just noise in the history.
+ */
 export const UTOWN_GYM_ID = 26;
 export const USC_GYM_ID = 39;
 
@@ -79,9 +85,24 @@ export async function fetchCapacityPage(url = CAPACITY_URL): Promise<string> {
   return response.text();
 }
 
-/** Fetch and parse in one step, stamping each row with the observation time. */
+/**
+ * Keep only the gyms.
+ *
+ * Filtering on `kind` rather than a fixed ID list means a third gym added by NUS
+ * is picked up automatically, while pools stay out.
+ */
+export function gymsOnly(facilities: Facility[]): Facility[] {
+  return facilities.filter((facility) => facility.kind === "gym");
+}
+
+/**
+ * Fetch, parse, and stamp each gym with the observation time.
+ *
+ * `now` is passed in so the whole batch shares one timestamp, which keeps rows
+ * from the same scrape groupable in D1 later.
+ */
 export async function observe(now = new Date()): Promise<Observation[]> {
-  const facilities = parseFacilities(await fetchCapacityPage());
+  const facilities = gymsOnly(parseFacilities(await fetchCapacityPage()));
   return facilities.map((facility) => ({ ...facility, observedAt: now }));
 }
 

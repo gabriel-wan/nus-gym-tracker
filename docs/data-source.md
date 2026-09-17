@@ -144,7 +144,7 @@ removed.
 **This creates a real ambiguity: `0` means "closed", "open but empty", or "counter
 offline", and the page gives us no way to tell them apart.**
 
-### An open question we could not resolve
+### A resolved case, and why the ambiguity remains
 
 At **20:38 SGT on a Wednesday** — peak evening — the readings were:
 
@@ -155,15 +155,24 @@ University Sports Centre - Gym:        109/110   <- effectively full
 University Town - Fitness gym:           0/120   <- ?
 ```
 
-USC at 99% while UTown reads exactly `0` is not plausible as real demand. The likely
-explanations are that the UTown gym was closed that evening, or that its people counter
-is offline. We could not distinguish these from the page alone.
+USC at 99% while UTown reads exactly `0` is not plausible as real demand.
+
+**Resolved: the UTown gym was closed**, reopening 18 September 2026. So the `0` was
+correct — it meant "closed", not "broken counter".
+
+**But note how we resolved it: someone told us.** The page itself gave no signal. There
+is no `closed` flag, no `null`, no missing box — a shut gym and an empty gym are byte
+identical. The specific case is settled; the general ambiguity is exactly as it was.
 
 **Implication for the project:** do not trust `0` as a measurement. Store it verbatim,
-but treat sustained zeroes as suspect, and expect to need a rule such as "if a facility
-reads 0 for N consecutive samples while others are active, flag it as unavailable
-rather than empty". Collecting a few days of history is the way to settle this — which
-is itself a good argument for getting the collector running early.
+but treat sustained zeroes as suspect. A workable rule, once there is history: if a
+facility reads 0 for N consecutive samples while the other gym is active, treat it as
+unavailable rather than empty. Long runs of zeroes are also how we can learn opening
+hours empirically, since REBOKS does not publish them here.
+
+**A free validation opportunity:** UTown reopens on 18 September 2026. If the collector
+is running by then, its first non-zero reading is direct confirmation that the counter
+works and that our reading of `0` was right. Worth deploying before that.
 
 ## Assumptions
 

@@ -46,9 +46,9 @@ Everything else waits until there is data to justify it.
 - A local Python prototype that fetches the REBOKS capacity page and prints occupancy,
   capacity, facility ID and timestamp for all four published facilities.
 - A Cloudflare Worker skeleton with the scraper ported to TypeScript, a `/health`
-  endpoint returning live occupancy as JSON, and a `scheduled()` handler wired to a
+  endpoint returning live gym occupancy as JSON, and a `scheduled()` handler wired to a
   15-minute cron. Both entry points run under `wrangler dev`.
-- Seven parser tests against a real saved REBOKS response.
+- Eight parser tests against a real saved REBOKS response.
 
 Nothing is deployed, and nothing is stored yet — `scheduled()` currently logs instead of
 writing to D1.
@@ -78,6 +78,7 @@ writing to D1.
 | Store observed timestamp, not scheduled time | Cron Triggers are not guaranteed to fire on time, so the schedule is not a reliable clock. |
 | Store UTC | Unambiguous and immune to any future timezone handling mistakes; convert to SGT only for display. |
 | No ML yet | There is no historical data to train or evaluate on. |
+| Track gyms only, not pools | This is a gym tracker. REBOKS publishes two pools; we parse them (that is what the `gymbox`/`swimbox` class is for) but do not store them, because unused rows are noise. Filtering on `kind` rather than a fixed ID list means a third gym would be picked up automatically. |
 | `wrangler.toml`, not `wrangler.jsonc` | Cloudflare recommends JSON for new projects, but TOML is fully supported and takes comments, which is worth more here than access to config-only features we do not use. |
 | Plain `vitest`, not `@cloudflare/vitest-pool-workers` | The parser is a pure function and needs no Workers runtime. The Workers test pool only becomes worthwhile when there are D1 bindings to test. |
 | Test against a real saved page | `tests/fixtures/capacity.html` is a genuine response, so the test fails if REBOKS changes its markup — handwritten HTML would only test our own assumptions. |
@@ -97,10 +98,11 @@ Stage 5  Prediction experiments                 blocked on Stage 4
 ## Important constraints
 
 - **Do not build ahead of need.** Features come after the data that justifies them.
-- **`0` is not trustworthy.** A facility reading `0` may be closed, empty, or have a
-  broken counter, and the page cannot distinguish these. UTown read `0/120` at peak
-  evening on 2026-09-17 while USC was at 99%. Store zeroes verbatim, but do not present
-  them as fact without more evidence.
+- **`0` is not trustworthy.** A gym reading `0` may be closed, empty, or have a broken
+  counter, and the page cannot distinguish these. UTown read `0/120` all evening on
+  2026-09-17 while USC was at 99%; that turned out to be a genuine closure (reopening
+  18 Sep 2026), but only because someone knew — the page gave no signal. Store zeroes
+  verbatim, never present them as "empty".
 - **Compare percentages, not headcount.** The gyms have different capacities (120 vs
   110), so raw numbers are not comparable.
 - **Be a polite client.** One request per 15 minutes, honest User-Agent, no retry storms.

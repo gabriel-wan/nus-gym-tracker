@@ -41,10 +41,12 @@ curl http://127.0.0.1:8787/health
 curl "http://127.0.0.1:8787/cdn-cgi/local/scheduled"
 ```
 
-`/health` returns live occupancy as JSON. The second URL manually fires the cron
-handler, which is how Wrangler lets you test a scheduled run without waiting.
+`/health` returns live gym occupancy as JSON. The second URL manually fires the cron
+handler, which is how Wrangler lets you test a scheduled run without waiting 15 minutes.
 
-The original Python prototype still works and remains the reference implementation:
+REBOKS also publishes two swimming pools. This project parses them but does not track
+them — it is a gym tracker. The Python prototype predates that decision and still prints
+everything:
 
 ```bash
 python prototype/scrape.py
@@ -58,6 +60,8 @@ Observed at 2026-09-17 21:08:10 SGT
 [ 39] University Sports Centre - Gym: 106/110 (96%)
 [ 26] University Town - Fitness gym: 0/120 (0%)
 ```
+
+UTown showing `0/120` there is correct — the gym was closed, reopening 18 Sep 2026.
 
 ## Layout
 
@@ -105,9 +109,11 @@ actually exist.
 
 ## A note on the data
 
-A reading of `0` cannot be trusted. The page gives no way to distinguish "closed" from
-"empty" from "the counter is offline" — UTown reported `0/120` at peak evening while USC
-was at 99%. See [docs/data-source.md](docs/data-source.md).
+A reading of `0` cannot be trusted on its own. The page gives no way to distinguish
+"closed" from "empty" from "the counter is offline" — UTown reported `0/120` at peak
+evening while USC was at 99%. That case turned out to be a genuine closure, but only
+because we were told; the page itself showed nothing. See
+[docs/data-source.md](docs/data-source.md).
 
 ## Etiquette
 
