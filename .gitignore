@@ -1,0 +1,16 @@
+# Secrets — the Telegram bot token lives in Wrangler secrets, never in the repo
+.env
+.dev.vars
+
+# Python (prototype/)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node / Cloudflare (from Stage 1 onwards)
+node_modules/
+.wrangler/
+
+# Local scraper output
+*.csv

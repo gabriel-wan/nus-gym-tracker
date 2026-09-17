@@ -1,0 +1,100 @@
+# NUS Gym Tracker — project context
+
+This file is the shared context for the project. It is written both for me and for any
+coding agent working on the repository. Read this first, then `docs/TODO.md`.
+
+## What it is
+
+A small Telegram bot that reports how crowded NUS gyms are, and — eventually — when they
+are likely to be quiet.
+
+Initially two facilities:
+
+- University Town - Fitness gym (facility ID 26)
+- University Sports Centre - Gym (facility ID 39)
+
+## Why I am building it
+
+NUS already publishes live gym occupancy, but only as a snapshot on a page you have to
+go and look at. Two things are missing:
+
+1. **Convenience.** Checking means opening uNivUS, being redirected to REBOKS, and
+   reading a page. A Telegram message is faster.
+2. **History.** The page shows *now* and nothing else. Nobody is keeping the numbers, so
+   you cannot answer "is 7pm always this bad?" or "is it quieter at 9pm?". That question
+   is the actual point of the project.
+
+This is also a learning and portfolio project. Understanding the system matters more
+than the amount of code in it, so it is built in deliberate stages with the reasoning
+written down.
+
+## The problem it solves
+
+Deciding *when* to go to the gym, rather than discovering on arrival that it is full.
+On 2026-09-17 at 20:38 the USC gym was at 109/110 — useful to know before walking there.
+
+## Current goals
+
+1. Reliably read live occupancy from REBOKS. **(done — Stage 0)**
+2. Collect it automatically so history accumulates.
+3. Expose the current reading over Telegram via `/gym`.
+
+Everything else waits until there is data to justify it.
+
+## Current features
+
+- A local Python prototype that fetches the REBOKS capacity page and prints occupancy,
+  capacity, facility ID and timestamp for all four published facilities.
+
+That is the whole implementation today. Nothing is deployed or stored.
+
+## Planned features
+
+| Command | Purpose | Requires |
+|---|---|---|
+| `/gym` | current occupancy for both gyms | Worker + Telegram |
+| `/history` | typical crowding by hour/day | weeks of collected data |
+| `/best` | quietest time today | historical patterns |
+| `/predict` | occupancy 30/60/90 min ahead | modelling, and a baseline to beat |
+| `/alert` | notify when a gym drops below a threshold | per-user state |
+
+`/gym` is the only one in scope now. The rest are blocked on data we do not have yet.
+
+## Technical decisions
+
+| Decision | Reasoning |
+|---|---|
+| Scrape HTML, not JSON | A JSON API is referenced in REBOKS's own JavaScript but every endpoint returns 404, identical to a nonexistent route. See `docs/data-source.md`. |
+| Regex over an HTML parser | The markup is machine-generated, uniform and unnested. Adding a parser dependency would buy nothing. |
+| Python prototype first | Stage 0 is about understanding the data source. Doing that locally avoids learning Cloudflare and REBOKS at the same time. |
+| Cloudflare Workers + D1 | The workload is one request every 15 minutes. Free tier covers it with ~250× headroom, and D1 binds to the Worker with no extra credentials. |
+| Telegram webhooks, not long polling | Long polling needs an always-on process, which would rule out serverless entirely. |
+| Store `capacity` per observation | Capacity is a property of the moment, not the facility, and appears to change over time. |
+| Store observed timestamp, not scheduled time | Cron Triggers are not guaranteed to fire on time, so the schedule is not a reliable clock. |
+| Store UTC | Unambiguous and immune to any future timezone handling mistakes; convert to SGT only for display. |
+| No ML yet | There is no historical data to train or evaluate on. |
+
+## Current implementation state
+
+```
+Stage 0  Investigate REBOKS + build scraper     DONE
+Stage 1  Move scraper into a Cloudflare Worker  not started
+Stage 2  D1 schema + scheduled collection       not started
+Stage 3  Telegram /gym                          not started
+Stage 4  Historical analysis                    blocked on data
+Stage 5  Prediction experiments                 blocked on Stage 4
+```
+
+## Important constraints
+
+- **Do not build ahead of need.** Features come after the data that justifies them.
+- **`0` is not trustworthy.** A facility reading `0` may be closed, empty, or have a
+  broken counter, and the page cannot distinguish these. UTown read `0/120` at peak
+  evening on 2026-09-17 while USC was at 99%. Store zeroes verbatim, but do not present
+  them as fact without more evidence.
+- **Compare percentages, not headcount.** The gyms have different capacities (120 vs
+  110), so raw numbers are not comparable.
+- **Be a polite client.** One request per 15 minutes, honest User-Agent, no retry storms.
+  REBOKS is a university service, not an API product.
+- **No secrets in the repository.** The Telegram bot token goes in Wrangler secrets.
+- **Minimal dependencies.** Every added dependency needs a justification.
