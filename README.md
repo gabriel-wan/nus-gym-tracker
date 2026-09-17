@@ -15,13 +15,13 @@ Currently tracking:
 
 ## Status
 
-**Collecting into D1 locally. Not deployed yet — that needs a Cloudflare account.**
+**Deployed and collecting. `/gym` works; the bot needs its webhook registered.**
 
 ```
 [x] Stage 0  Investigate REBOKS, build scraper
 [x] Stage 1  Cloudflare Worker
-[x] Stage 2  D1 storage + cron   (works locally; deploy pending)
-[ ] Stage 3  Telegram /gym
+[x] Stage 2  D1 storage + cron
+[x] Stage 3  Telegram /gym
 [ ] Stage 4  Historical analysis
 ```
 
@@ -76,6 +76,7 @@ UTown showing `0/120` there is correct — the gym was closed, reopening 18 Sep 
 src/index.ts        Worker entry: scheduled() + fetch()
 src/reboks.ts       fetch + parse the REBOKS page
 src/db.ts           read/write occupancy history in D1
+src/telegram.ts     bot replies and the Telegram Bot API
 tests/              parser tests against a real saved page
 migrations/         D1 schema
 prototype/          the original Python scraper
@@ -111,9 +112,8 @@ The data source is a public, unauthenticated page. No NUS login is involved.
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the components fit together and why |
 | [docs/DATA-SOURCE.md](docs/DATA-SOURCE.md) | The REBOKS investigation — findings, assumptions, failure modes |
 | [docs/DATABASE.md](docs/DATABASE.md) | Schema, why each column exists, why the index |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Cloudflare, D1, secrets, webhook, cron |
 | [docs/TODO.md](docs/TODO.md) | What is next |
-
-`docs/DEPLOYMENT.md` will be added when there is a deployment to document.
 
 ## A note on the data
 

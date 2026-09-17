@@ -48,16 +48,17 @@ Everything else waits until there is data to justify it.
 - A Cloudflare Worker whose `scheduled()` handler scrapes REBOKS and writes one row per
   gym into D1, and whose `/health` endpoint reads the latest rows back out.
 - An `occupancy` table with a single migration.
-- Eight parser tests against a real saved REBOKS response.
+- A Telegram webhook that answers `/gym`, `/start` and `/help`, rejecting anything that
+  does not carry the shared secret.
+- 21 tests: REBOKS parsing against a real saved page, and the bot's replies.
 
-All of it verified locally under `wrangler dev`. Nothing is deployed — that needs a
-Cloudflare account, so no history is accumulating yet.
+Deployed to Cloudflare. The bot still needs `setWebhook` pointing at the Worker.
 
 ## Planned features
 
 | Command | Purpose | Requires |
 |---|---|---|
-| `/gym` | current occupancy for both gyms | Worker + Telegram |
+| `/gym` | current occupancy for both gyms | done |
 | `/history` | typical crowding by hour/day | weeks of collected data |
 | `/best` | quietest time today | historical patterns |
 | `/predict` | occupancy 30/60/90 min ahead | modelling, and a baseline to beat |
@@ -92,8 +93,8 @@ Cloudflare account, so no history is accumulating yet.
 ```
 Stage 0  Investigate REBOKS + build scraper     DONE
 Stage 1  Move scraper into a Cloudflare Worker  DONE - runs locally
-Stage 2  D1 schema + scheduled collection       DONE locally - deploy pending
-Stage 3  Telegram /gym                          not started
+Stage 2  D1 schema + scheduled collection       DONE - deployed
+Stage 3  Telegram /gym                          DONE - webhook registration pending
 Stage 4  Historical analysis                    blocked on data
 Stage 5  Prediction experiments                 blocked on Stage 4
 ```
