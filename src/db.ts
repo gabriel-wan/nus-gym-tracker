@@ -8,7 +8,7 @@ import type { Observation } from "./reboks";
 
 /** A row as it comes back out of the database. */
 export interface Reading {
-  observedAt: string;
+  collectedAt: string;
   facilityId: number;
   facilityName: string;
   occupancy: number;
@@ -16,7 +16,7 @@ export interface Reading {
 }
 
 const INSERT = `
-  INSERT INTO occupancy (observed_at, facility_id, facility_name, occupancy, capacity)
+  INSERT INTO occupancy (collected_at, facility_id, facility_name, occupancy, capacity)
   VALUES (?, ?, ?, ?, ?)
 `;
 
@@ -37,7 +37,7 @@ export async function insertObservations(
   await db.batch(
     observations.map((o) =>
       insert.bind(
-        o.observedAt.toISOString(),
+        o.collectedAt.toISOString(),
         o.facilityId,
         o.name,
         o.occupancy,
@@ -55,19 +55,19 @@ export async function insertObservations(
  * bare columns alongside MAX(), but the explicit join says what it means.
  */
 const LATEST = `
-  SELECT o.observed_at   AS observedAt,
+  SELECT o.collected_at  AS collectedAt,
          o.facility_id   AS facilityId,
          o.facility_name AS facilityName,
          o.occupancy     AS occupancy,
          o.capacity      AS capacity
   FROM occupancy o
   JOIN (
-    SELECT facility_id, MAX(observed_at) AS newest
+    SELECT facility_id, MAX(collected_at) AS newest
     FROM occupancy
     GROUP BY facility_id
   ) latest
     ON o.facility_id = latest.facility_id
-   AND o.observed_at = latest.newest
+   AND o.collected_at = latest.newest
   ORDER BY o.facility_id
 `;
 

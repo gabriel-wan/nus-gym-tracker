@@ -7,7 +7,7 @@ Cloudflare D1, which is managed SQLite. One table.
 ```sql
 CREATE TABLE occupancy (
   id            INTEGER PRIMARY KEY,
-  observed_at   TEXT    NOT NULL,
+  collected_at  TEXT    NOT NULL,
   facility_id   INTEGER NOT NULL,
   facility_name TEXT    NOT NULL,
   occupancy     INTEGER NOT NULL,
@@ -15,7 +15,7 @@ CREATE TABLE occupancy (
 );
 
 CREATE INDEX idx_occupancy_facility_time
-  ON occupancy (facility_id, observed_at);
+  ON occupancy (facility_id, collected_at);
 ```
 
 One row per gym per scrape. Two gyms, 72 scrapes a day, so 144 rows a day and roughly
@@ -26,12 +26,18 @@ One row per gym per scrape. Two gyms, 72 scrapes a day, so 144 rows a day and ro
 **`id`** — `INTEGER PRIMARY KEY` in SQLite is an alias for the built-in `rowid`, so this
 costs nothing and gives every reading a stable handle.
 
-**`observed_at`** — when we actually read the value, not when the cron was scheduled.
-Cloudflare does not guarantee crons fire on time, so the schedule is not a usable clock.
+**`collected_at`** — when we read the value, not when the cron was scheduled. Cloudflare
+does not guarantee crons fire on time, so the schedule is not a usable clock.
+
+It is deliberately *not* called `observed_at`. There is no observation timestamp to be
+had: REBOKS renders a "Last Updated at" line, but it is the page render time and tracks
+the request clock second for second, so it says nothing about when the counter last
+changed. Storing it would be inventing precision. The gap between when a person scanned
+in and when we noticed is real, unknown, and bounded only by our 15-minute interval.
 
 Stored as ISO-8601 text in **UTC**, e.g. `2026-09-17T13:13:15Z`. Text rather than an
 integer epoch because ISO-8601 sorts lexicographically in the same order it sorts
-chronologically, so `ORDER BY observed_at` just works, and because it is readable when
+chronologically, so `ORDER BY collected_at` just works, and because it is readable when
 you are poking at the database by hand. UTC rather than SGT because it is unambiguous;
 Singapore never changes offset, but storing local time is a habit that eventually bites.
 
@@ -39,7 +45,7 @@ Analysis converts at query time:
 
 ```sql
 -- hour of day, Singapore time
-SELECT strftime('%H', datetime(observed_at, '+8 hours')) AS hour_sgt, AVG(occupancy)
+SELECT strftime('%H', datetime(collected_at, '+8 hours')) AS hour_sgt, AVG(occupancy)
 FROM occupancy WHERE facility_id = 39 GROUP BY hour_sgt;
 ```
 
@@ -65,7 +71,7 @@ capacity that was in force at the time.
 ## Why this index
 
 ```sql
-CREATE INDEX idx_occupancy_facility_time ON occupancy (facility_id, observed_at);
+CREATE INDEX idx_occupancy_facility_time ON occupancy (facility_id, collected_at);
 ```
 
 Both of our query shapes are "one gym, ordered by time":
@@ -73,7 +79,7 @@ Both of our query shapes are "one gym, ordered by time":
 - `/gym` — the most recent row for each gym.
 - Historical analysis — all rows for a gym within a date range.
 
-A composite index on `(facility_id, observed_at)` serves both: it narrows to the gym
+A composite index on `(facility_id, collected_at)` serves both: it narrows to the gym
 first, then the rows are already in time order within that group, so there is no sort.
 
 It is worth saying that at 53,000 rows a year SQLite would scan the whole table quickly
@@ -84,8 +90,8 @@ right call would be to add no index yet and wait for a slow one.
 ## What is deliberately absent
 
 - **No `facilities` table.** Two gyms. A join to look up two names would be ceremony.
-- **No unique constraint on `(facility_id, observed_at)`.** It would not prevent much:
-  `observed_at` is our own clock, so a re-run produces a different timestamp anyway.
+- **No unique constraint on `(facility_id, collected_at)`.** It would not prevent much:
+  `collected_at` is our own clock, so a re-run produces a different timestamp anyway.
   Duplicate near-identical rows are easy to spot later; a constraint that silently drops
   a legitimate reading is not.
 - **No `is_closed` or `is_suspect` column.** We do not know at write time whether a `0`
@@ -100,6 +106,10 @@ Files live in `migrations/`, numbered and applied in order. D1 tracks what it ha
 npx wrangler d1 migrations apply nus-gym-tracker --local    # local SQLite file
 npx wrangler d1 migrations apply nus-gym-tracker --remote   # the real database
 ```
+
+A remote migration that renames or drops a column must be paired with `npm run deploy`,
+and run close together: between the two, the live Worker is talking to a schema that no
+longer matches it. Adding a column is safe on its own; changing one is not.
 
 Local development keeps its own SQLite file under `.wrangler/` and ignores
 `database_id`, so the whole thing can be built and tested without a Cloudflare account.

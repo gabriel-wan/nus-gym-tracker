@@ -30,8 +30,8 @@ export interface Facility {
 }
 
 export interface Observation extends Facility {
-  /** When we read the value, in UTC. Not when the cron was scheduled. */
-  observedAt: Date;
+  /** When we collected it, in UTC. REBOKS publishes no observation time. */
+  collectedAt: Date;
 }
 
 /**
@@ -103,7 +103,7 @@ export function gymsOnly(facilities: Facility[]): Facility[] {
  */
 export async function observe(now = new Date()): Promise<Observation[]> {
   const facilities = gymsOnly(parseFacilities(await fetchCapacityPage()));
-  return facilities.map((facility) => ({ ...facility, observedAt: now }));
+  return facilities.map((facility) => ({ ...facility, collectedAt: now }));
 }
 
 /**
