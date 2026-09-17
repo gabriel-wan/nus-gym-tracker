@@ -182,6 +182,28 @@ export function formatGymMessage(readings: Reading[], now: Date): string {
 }
 
 /**
+ * Should a failed run alert, given when collection last succeeded?
+ *
+ * Alert on the first failure of an outage, then go quiet. The signal that we
+ * have already alerted is simply that the newest stored reading is no longer
+ * recent - no extra table needed to remember we sent a message.
+ *
+ * The window is a little over two sampling intervals. Tighter would risk a
+ * delayed cron run looking like an ongoing outage and alerting for nothing at
+ * all, which is the failure this whole mechanism exists to prevent. Wider means
+ * more duplicate messages. At 5-minute sampling this sends at most two.
+ */
+const ALERT_WINDOW_MINUTES = 12;
+
+export function shouldAlertOnFailure(lastSuccess: string | null, now: Date): boolean {
+  // Nothing has ever been collected: this is the first failure there has been.
+  if (lastSuccess === null) return true;
+
+  const minutesSince = (now.getTime() - Date.parse(lastSuccess)) / 60000;
+  return minutesSince <= ALERT_WINDOW_MINUTES;
+}
+
+/**
  * The message sent to the operator when a collection run fails.
  *
  * Deliberately blunt: this is the only thing standing between a broken

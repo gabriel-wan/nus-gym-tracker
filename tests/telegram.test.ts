@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Reading } from "../src/db";
-import { formatGymMessage, parseCommand } from "../src/telegram";
+import { formatGymMessage, parseCommand, shouldAlertOnFailure } from "../src/telegram";
 
 /** 13:00 UTC is 21:00 SGT, inside opening hours. */
 const EVENING = new Date("2026-09-18T13:00:00Z");
@@ -150,5 +150,37 @@ describe("formatGymMessage", () => {
 
   it("explains an empty database instead of showing nothing", () => {
     expect(formatGymMessage([], EVENING)).toContain("No readings yet");
+  });
+});
+
+describe("shouldAlertOnFailure", () => {
+  const now = new Date("2026-09-18T12:00:00Z");
+
+  it("alerts when collection succeeded moments ago - something just broke", () => {
+    expect(shouldAlertOnFailure("2026-09-18T11:55:00Z", now)).toBe(true);
+  });
+
+  it("stays quiet once the outage is established, so it cannot spam", () => {
+    expect(shouldAlertOnFailure("2026-09-18T11:40:00Z", now)).toBe(false);
+    expect(shouldAlertOnFailure("2026-09-18T09:00:00Z", now)).toBe(false);
+  });
+
+  it("alerts when nothing has ever been collected", () => {
+    expect(shouldAlertOnFailure(null, now)).toBe(true);
+  });
+
+  // A late cron run must not look like an ongoing outage, or the one alert that
+  // matters never arrives.
+  it("still alerts when a run was delayed past its slot", () => {
+    expect(shouldAlertOnFailure("2026-09-18T11:49:00Z", now)).toBe(true);
+  });
+
+  it("sends at most two messages per outage at 5-minute sampling", () => {
+    const lastSuccess = "2026-09-18T12:00:00Z";
+    const alerts = [5, 10, 15, 20, 25, 30].filter((mins) =>
+      shouldAlertOnFailure(lastSuccess, new Date(Date.parse(lastSuccess) + mins * 60000)),
+    );
+
+    expect(alerts).toEqual([5, 10]);
   });
 });

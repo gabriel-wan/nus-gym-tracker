@@ -15,6 +15,7 @@ import {
   helpMessage,
   parseCommand,
   sendMessage,
+  shouldAlertOnFailure,
   startMessage,
   type TelegramUpdate,
 } from "./telegram";
@@ -30,15 +31,6 @@ export interface Env {
   // and read the chat id from `wrangler tail` to find yours.
   ALERT_CHAT_ID?: string;
 }
-
-/**
- * Don't re-alert during an ongoing outage.
- *
- * If the newest stored reading is already older than this, we have alerted for
- * this outage once and staying quiet. Using the data we already have avoids a
- * second table just to remember that we sent a message.
- */
-const ALERT_IF_LAST_SUCCESS_WITHIN_MINUTES = 20;
 
 /** Where Telegram posts updates. Told to Telegram once, via setWebhook. */
 const WEBHOOK_PATH = "/telegram";
@@ -161,19 +153,7 @@ async function reportCollectionFailure(env: Env, error: unknown): Promise<void> 
 
   try {
     const lastSuccess = await newestCollectedAt(env.DB);
-
-    const minutesSinceSuccess =
-      lastSuccess === null
-        ? Infinity
-        : (Date.now() - Date.parse(lastSuccess)) / 60000;
-
-    // Alert on the first failure of an outage, and on the very first failure
-    // ever (when there is no successful run to compare against).
-    const firstFailureOfOutage =
-      lastSuccess === null ||
-      minutesSinceSuccess <= ALERT_IF_LAST_SUCCESS_WITHIN_MINUTES;
-
-    if (!firstFailureOfOutage) return;
+    if (!shouldAlertOnFailure(lastSuccess, new Date())) return;
 
     await sendMessage(
       env.TELEGRAM_BOT_TOKEN,
