@@ -117,7 +117,7 @@ To look at the data directly:
 
 ```bash
 npx wrangler d1 execute nus-gym-tracker --remote \
-  --command "SELECT COUNT(*) AS rows, MAX(observed_at) AS last FROM occupancy;"
+  --command "SELECT COUNT(*) AS rows, MAX(collected_at) AS last FROM occupancy;"
 ```
 
 ## The cron

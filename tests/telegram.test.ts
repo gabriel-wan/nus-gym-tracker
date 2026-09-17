@@ -12,10 +12,10 @@ function reading(
   facilityId: number,
   occupancy: number,
   capacity: number,
-  observedAt = "2026-09-18T12:56:00Z",
+  collectedAt = "2026-09-18T12:56:00Z",
 ): Reading {
   return {
-    observedAt,
+    collectedAt,
     facilityId,
     facilityName: facilityId === 39 ? "University Sports Centre - Gym" : "University Town - Fitness gym",
     occupancy,
@@ -49,9 +49,9 @@ describe("formatGymMessage", () => {
   it("names the quieter gym", () => {
     const message = formatGymMessage([usc(22), utown(84)], EVENING);
 
-    expect(message).toContain("22/110 (20%)");
-    expect(message).toContain("84/120 (70%)");
-    expect(message).toContain("USC is quieter right now");
+    expect(message).toContain("22 / 110 · 20% full");
+    expect(message).toContain("84 / 120 · 70% full");
+    expect(message).toContain("USC Gym is quieter right now");
   });
 
   it("lists the quietest gym first", () => {
@@ -62,8 +62,9 @@ describe("formatGymMessage", () => {
   it("does not call a gym quiet when it reads zero", () => {
     const message = formatGymMessage([usc(60), utown(0)], EVENING);
 
-    expect(message).toContain("UTown reads 0");
-    expect(message).not.toContain("UTown is quieter");
+    expect(message).toContain("closed or empty");
+    expect(message).toContain("Only USC Gym looks open");
+    expect(message).not.toContain("UTown Gym is quieter");
   });
 
   it("says closed outside opening hours rather than reporting 0%", () => {
@@ -95,6 +96,23 @@ describe("formatGymMessage", () => {
 
     expect(message).toContain("closed");
     expect(message).not.toContain("may be stuck");
+  });
+
+  it("colours the bands: green under 40, amber to 70, red above", () => {
+    expect(formatGymMessage([usc(22)], EVENING)).toContain("\u{1F7E2}");
+    expect(formatGymMessage([usc(60)], EVENING)).toContain("\u{1F7E1}");
+    expect(formatGymMessage([usc(99)], EVENING)).toContain("\u{1F534}");
+  });
+
+  it("uses a neutral marker for 0 rather than a reassuring green", () => {
+    const message = formatGymMessage([usc(0)], EVENING);
+
+    expect(message).toContain("⚪");
+    expect(message).not.toContain("\u{1F7E2}");
+  });
+
+  it("always carries the scan caveat", () => {
+    expect(formatGymMessage([usc(40)], EVENING)).toContain("may read high");
   });
 
   it("explains an empty database instead of showing nothing", () => {

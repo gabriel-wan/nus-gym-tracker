@@ -8,18 +8,26 @@
 import type { Reading } from "./db";
 import { percentFull } from "./reboks";
 
-/** Short labels. The REBOKS names are too long for a chat message. */
-const SHORT_NAMES: Record<number, string> = {
-  26: "UTown",
-  39: "USC",
+/** Display names. The REBOKS names are too long for a chat message. */
+const GYM_NAMES: Record<number, string> = {
+  26: "UTown Gym",
+  39: "USC Gym",
 };
 
 /** Gym opening hours, Singapore time. */
 const OPEN_HOUR = 7;
 const CLOSE_HOUR = 22;
 
-/** Readings older than this are worth apologising for. */
+/** A reading older than this, while the gyms are open, is worth flagging. */
 const STALE_AFTER_MINUTES = 30;
+
+/**
+ * Crowd bands. These are our labels for the sake of a readable message - NUS
+ * publishes no definition of "busy", so nothing here should be presented as
+ * official.
+ */
+const BUSY_PERCENT = 70;
+const MODERATE_PERCENT = 40;
 
 /**
  * The slice of Telegram's Update object we actually use. Telegram sends far
@@ -54,98 +62,144 @@ function isOpen(now: Date): boolean {
   return hour >= OPEN_HOUR && hour < CLOSE_HOUR;
 }
 
-function label(reading: Reading): string {
-  return SHORT_NAMES[reading.facilityId] ?? reading.facilityName;
+function gymName(reading: Reading): string {
+  return GYM_NAMES[reading.facilityId] ?? reading.facilityName;
 }
 
-function minutesAgo(observedAt: string, now: Date): number {
-  const elapsed = now.getTime() - new Date(observedAt).getTime();
+function minutesAgo(collectedAt: string, now: Date): number {
+  const elapsed = now.getTime() - new Date(collectedAt).getTime();
   return Math.max(0, Math.round(elapsed / 60000));
 }
 
 function describeAge(minutes: number): string {
-  if (minutes < 1) return "Updated just now.";
-  if (minutes < 60) return `Updated ${minutes} min ago.`;
+  if (minutes < 1) return "Updated just now";
+  if (minutes < 60) return `Updated ${minutes} min ago`;
   const hours = Math.round(minutes / 60);
-  return `Updated about ${hours} hour${hours === 1 ? "" : "s"} ago.`;
+  return `Updated about ${hours} hour${hours === 1 ? "" : "s"} ago`;
 }
 
 /**
- * The line that actually answers "which gym should I go to".
+ * One gym, two lines.
  *
- * A gym reading 0 is not evidence that it is quiet - it is more often closed or
- * a counter nobody has scanned into. Calling it "quieter" would be the single
- * most misleading thing this bot could say, so that case is handled first.
+ * A zero gets a white circle rather than a green one. Green would read as
+ * "wonderfully empty, go now", when 0 almost always means the gym is shut.
  */
-function verdict(readings: Reading[], now: Date): string {
-  if (!isOpen(now)) {
-    return `Both gyms are closed. They open at ${OPEN_HOUR}am.`;
+function gymBlock(reading: Reading): string {
+  const pct = percentFull(reading);
+
+  if (reading.occupancy === 0) {
+    return `${gymName(reading)}\n⚪ ${reading.occupancy} / ${reading.capacity} · closed or empty`;
   }
 
-  const empty = readings.filter((r) => r.occupancy === 0);
-  if (empty.length === readings.length) {
-    return "Every gym reads 0, which usually means closed rather than empty.";
-  }
-  if (empty.length > 0) {
-    const names = empty.map(label).join(" and ");
-    return `${names} reads 0 - probably closed rather than empty.`;
-  }
+  const icon =
+    pct === null ? "⚪" : pct >= BUSY_PERCENT ? "\u{1F534}" : pct >= MODERATE_PERCENT ? "\u{1F7E1}" : "\u{1F7E2}";
 
-  const [quietest, busiest] = [...readings].sort(
+  return `${gymName(reading)}\n${icon} ${reading.occupancy} / ${reading.capacity} · ${pct?.toFixed(0)}% full`;
+}
+
+/**
+ * The line that actually answers "should I go now".
+ *
+ * A gym reading 0 is not evidence that it is quiet - it is more often closed.
+ * Calling it "quieter" would be the most misleading thing this bot could say,
+ * so that case is handled before any comparison.
+ */
+function verdict(readings: Reading[], now: Date): string | null {
+  if (!isOpen(now)) return `Both gyms are closed. They open at ${OPEN_HOUR}am.`;
+
+  const open = readings.filter((r) => r.occupancy > 0);
+  if (open.length === 0) return "Both read 0, which usually means closed.";
+  if (open.length === 1) return `Only ${gymName(open[0])} looks open right now.`;
+
+  const [quietest, busiest] = [...open].sort(
     (a, b) => (percentFull(a) ?? 0) - (percentFull(b) ?? 0),
   );
-  if (!busiest) return "";
-
   const gap = (percentFull(busiest) ?? 0) - (percentFull(quietest) ?? 0);
+
   if (gap < 5) return "Both about the same right now.";
-  return `${label(quietest)} is quieter right now.`;
+  return `${gymName(quietest)} is quieter right now.`;
 }
 
 /** The reply to /gym. */
 export function formatGymMessage(readings: Reading[], now: Date): string {
   if (readings.length === 0) {
-    return "No readings yet. The collector may not have run - try again shortly.";
+    return [
+      "\u{1F3CB} NUS Gym Tracker",
+      "",
+      "No readings yet.",
+      "",
+      "The collector has not recorded any gym data, so there is nothing to show.",
+      "Try again in a few minutes.",
+    ].join("\n");
   }
+
+  // Quietest first: the whole point of the message is where to go.
+  const ordered = [...readings].sort(
+    (a, b) => (percentFull(a) ?? 0) - (percentFull(b) ?? 0),
+  );
 
   const lines = ["\u{1F3CB} NUS Gym Tracker", ""];
-
-  for (const reading of [...readings].sort(
-    (a, b) => (percentFull(a) ?? 0) - (percentFull(b) ?? 0),
-  )) {
-    const pct = percentFull(reading);
-    lines.push(label(reading));
-    lines.push(
-      `${reading.occupancy}/${reading.capacity}` +
-        (pct === null ? "" : ` (${pct.toFixed(0)}%)`),
-    );
-    lines.push("");
+  for (const reading of ordered) {
+    lines.push(gymBlock(reading), "");
   }
 
-  lines.push(verdict(readings, now));
+  const call = verdict(readings, now);
+  if (call) lines.push(call);
 
-  const age = minutesAgo(readings[0].observedAt, now);
+  const age = minutesAgo(readings[0].collectedAt, now);
   lines.push(describeAge(age));
 
   // Only suspect a stuck collector while the gyms are open. Overnight the cron
-  // is deliberately not running, so stale readings are expected, and warning
-  // about them every morning would train the reader to ignore the warning.
+  // is deliberately idle, and a warning every morning is one you learn to skip.
   if (age > STALE_AFTER_MINUTES && isOpen(now)) {
-    lines.push("That is older than usual - the collector may be stuck.");
+    lines.push("⚠ Data may be stale - the collector may be stuck.");
   }
+
+  lines.push("", "⚠ Counts come from entry scans and may read high. /about");
 
   return lines.join("\n").trim();
 }
 
-/** The reply to /start and /help. */
+/** The reply to /start. */
+export function startMessage(): string {
+  return [
+    "\u{1F3CB} Welcome to NUS Gym Tracker",
+    "",
+    "Check how busy the NUS gyms are before you head down.",
+    "",
+    "/gym - current crowd levels",
+    "/about - where the numbers come from",
+    "/help - all commands",
+  ].join("\n");
+}
+
+/** The reply to /help. */
 export function helpMessage(): string {
   return [
     "\u{1F3CB} NUS Gym Tracker",
     "",
-    "/gym - how busy UTown and USC are right now",
+    "/gym - current crowd levels",
+    "/about - how the data is collected",
+    "/help - show commands",
     "",
-    "Numbers come from NUS REBOKS, sampled every 15 minutes while the gyms are",
-    `open (${OPEN_HOUR}am-${CLOSE_HOUR - 12}pm daily). Entry is by QR scan and people`,
-    "often forget to scan out, so the count tends to read high.",
+    "Data comes from NUS REBOKS, sampled every 15 minutes while the gyms are open.",
+  ].join("\n");
+}
+
+/** The reply to /about. Everything the numbers do not say for themselves. */
+export function aboutMessage(): string {
+  return [
+    "\u{1F3CB} NUS Gym Tracker",
+    "",
+    `Readings come from the public NUS REBOKS capacity page, collected every 15 minutes while the gyms are open (${OPEN_HOUR}am-${CLOSE_HOUR - 12}pm daily).`,
+    "",
+    "What the number is not:",
+    "Entry is by QR scan, and people often forget to scan out. The count is really 'scanned in and not yet scanned out', so it tends to read higher than the number of people actually in the gym.",
+    "",
+    "A reading of 0 usually means closed rather than empty. The page gives no way to tell those apart.",
+    "",
+    "Colour bands are our labels, not an NUS definition of busy:",
+    `\u{1F7E2} under ${MODERATE_PERCENT}%   \u{1F7E1} ${MODERATE_PERCENT}-${BUSY_PERCENT}%   \u{1F534} over ${BUSY_PERCENT}%`,
   ].join("\n");
 }
 

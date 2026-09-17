@@ -9,10 +9,12 @@
 import { insertObservations, latestReadings } from "./db";
 import { observe, percentFull } from "./reboks";
 import {
+  aboutMessage,
   formatGymMessage,
   helpMessage,
   parseCommand,
   sendMessage,
+  startMessage,
   type TelegramUpdate,
 } from "./telegram";
 
@@ -70,7 +72,7 @@ export default {
           occupancy: reading.occupancy,
           capacity: reading.capacity,
           percent: percentFull(reading),
-          observedAt: reading.observedAt,
+          collectedAt: reading.collectedAt,
         })),
       });
     }
@@ -119,8 +121,11 @@ async function replyTo(command: string, env: Env): Promise<string | null> {
     case "/gym":
       return formatGymMessage(await latestReadings(env.DB), new Date());
     case "/start":
+      return startMessage();
     case "/help":
       return helpMessage();
+    case "/about":
+      return aboutMessage();
     default:
       return null;
   }

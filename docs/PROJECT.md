@@ -59,7 +59,8 @@ Deployed to Cloudflare. The bot still needs `setWebhook` pointing at the Worker.
 | Command | Purpose | Requires |
 |---|---|---|
 | `/gym` | current occupancy for both gyms | done |
-| `/history` | typical crowding by hour/day | weeks of collected data |
+| `/start` `/help` `/about` | onboarding, commands, data caveats | done |
+| `/history` | recent trend, last 6-12 hours | a day or two of collected data |
 | `/best` | quietest time today | historical patterns |
 | `/predict` | occupancy 30/60/90 min ahead | modelling, and a baseline to beat |
 | `/alert` | notify when a gym drops below a threshold | per-user state |
@@ -76,7 +77,7 @@ Deployed to Cloudflare. The bot still needs `setWebhook` pointing at the Worker.
 | Cloudflare Workers + D1 | The workload is one request every 15 minutes. Free tier covers it with ~250× headroom, and D1 binds to the Worker with no extra credentials. |
 | Telegram webhooks, not long polling | Long polling needs an always-on process, which would rule out serverless entirely. |
 | Store `capacity` per observation | Capacity is a property of the moment, not the facility, and appears to change over time. |
-| Store observed timestamp, not scheduled time | Cron Triggers are not guaranteed to fire on time, so the schedule is not a reliable clock. |
+| Store `collected_at`, not `observed_at` | Cron Triggers are not guaranteed to fire on time, so the schedule is not a reliable clock. And REBOKS publishes no observation time - its "Last Updated at" is the page render clock - so collection time is the only honest timestamp we have. |
 | Store UTC | Unambiguous and immune to any future timezone handling mistakes; convert to SGT only for display. |
 | No ML yet | There is no historical data to train or evaluate on. |
 | Sample 06:00-23:59 SGT, not 24/7 | The gyms open 07:00-22:00 SGT, so overnight rows carry no information. An hour of buffer either side captures the opening/closing transitions and tolerates holiday hour changes. Cron Triggers run on UTC, so the window is written shifted back 8 hours. |

@@ -9,17 +9,19 @@
 - [x] Restrict the cron to gym opening hours (06:00-23:59 SGT)
 - [x] Create a Cloudflare account, then `wrangler login`
 - [x] Deploy the Worker
-- [ ] Confirm the cron actually fires on Cloudflare
+- [x] Register cron triggers (needed the workers.dev subdomain first)
+- [ ] Confirm the cron fires at 06:00 SGT
 
 ## Next
 - [x] D1 schema + first migration
 - [x] Write observations to D1 from `scheduled()`
 - [x] Telegram `/gym`
-- [ ] Register the webhook with setWebhook
+- [x] Register the webhook with setWebhook
 - [ ] Set the bot avatar in @BotFather
 
 ## Later
-- [ ] Historical analysis (`/history`, `/best`)
+- [ ] `/history` - recent trend, once a day of data exists
+- [ ] `/best` - quietest times, once there are weeks of data
 - [ ] Prediction, measured against a day-of-week/hour average baseline
 - [ ] Alerts
 
