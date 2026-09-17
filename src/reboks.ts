@@ -106,8 +106,16 @@ export async function observe(now = new Date()): Promise<Observation[]> {
   return facilities.map((facility) => ({ ...facility, observedAt: now }));
 }
 
-/** Percentage full, or null when capacity is unknown. */
-export function percentFull(facility: Facility): number | null {
-  if (!facility.capacity) return null;
-  return (100 * facility.occupancy) / facility.capacity;
+/**
+ * Percentage full, or null when capacity is unknown.
+ *
+ * Takes only the two fields it needs, so it works on a freshly parsed facility
+ * and on a row read back out of the database alike.
+ */
+export function percentFull(reading: {
+  occupancy: number;
+  capacity: number;
+}): number | null {
+  if (!reading.capacity) return null;
+  return (100 * reading.occupancy) / reading.capacity;
 }

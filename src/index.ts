@@ -2,19 +2,16 @@
  * Worker entry point.
  *
  * Two ways in:
- *   scheduled() - the Cron Trigger, every 15 minutes -> read REBOKS
+ *   scheduled() - the Cron Trigger -> read REBOKS, store in D1
  *   fetch()     - HTTP, later the Telegram webhook
- *
- * Scaffolding only. Storage (D1) is Stage 2 and Telegram is Stage 3; both are
- * marked below rather than half-implemented.
  */
 
+import { insertObservations, latestReadings } from "./db";
 import { observe, percentFull } from "./reboks";
 
 export interface Env {
-  // Stage 2: uncomment the d1_databases binding in wrangler.toml, then:
-  // DB: D1Database;
-  //
+  DB: D1Database;
+
   // Stage 3: set with `wrangler secret put TELEGRAM_BOT_TOKEN`, never in the repo.
   // TELEGRAM_BOT_TOKEN: string;
 }
@@ -29,35 +26,36 @@ export default {
    */
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     const observations = await observe();
+    await insertObservations(env.DB, observations);
 
-    for (const facility of observations) {
-      const pct = percentFull(facility);
-      console.log(
-        `${facility.name}: ${facility.occupancy}/${facility.capacity}` +
-          (pct === null ? "" : ` (${pct.toFixed(0)}%)`),
-      );
-    }
-
-    // Stage 2: write `observations` to D1 here.
+    // One line per run, so a broken scrape is visible in `wrangler tail`.
+    console.log(
+      `stored ${observations.length} readings: ` +
+        observations.map((o) => `${o.name} ${o.occupancy}/${o.capacity}`).join(", "),
+    );
   },
 
   /**
-   * HTTP handler. Stage 3 turns this into the Telegram webhook; for now it is a
-   * health check that proves the Worker is deployed and can reach REBOKS.
+   * HTTP handler. Stage 3 turns this into the Telegram webhook.
+   *
+   * `/health` reads from D1 rather than scraping. That is what the bot will do
+   * too: it shows whether the collector is actually running, and it keeps our
+   * traffic to REBOKS at one request per cron however many people ask.
    */
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname === "/health") {
-      const observations = await observe();
+      const readings = await latestReadings(env.DB);
+
       return Response.json({
-        ok: true,
-        observedAt: observations[0].observedAt.toISOString(),
-        facilities: observations.map((f) => ({
-          id: f.facilityId,
-          name: f.name,
-          occupancy: f.occupancy,
-          capacity: f.capacity,
+        ok: readings.length > 0,
+        gyms: readings.map((reading) => ({
+          name: reading.facilityName,
+          occupancy: reading.occupancy,
+          capacity: reading.capacity,
+          percent: percentFull(reading),
+          observedAt: reading.observedAt,
         })),
       });
     }

@@ -70,10 +70,10 @@ describe("gymsOnly", () => {
 
 describe("percentFull", () => {
   it("computes a percentage", () => {
-    expect(percentFull({ occupancy: 55, capacity: 110 } as never)).toBe(50);
+    expect(percentFull({ occupancy: 55, capacity: 110 })).toBe(50);
   });
 
   it("returns null when capacity is zero, rather than dividing by zero", () => {
-    expect(percentFull({ occupancy: 0, capacity: 0 } as never)).toBeNull();
+    expect(percentFull({ occupancy: 0, capacity: 0 })).toBeNull();
   });
 });

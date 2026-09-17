@@ -11,8 +11,8 @@
 - [ ] Deploy the Worker and confirm the cron fires on Cloudflare
 
 ## Next
-- [ ] D1 schema + first migration
-- [ ] Write observations to D1 from `scheduled()`
+- [x] D1 schema + first migration
+- [x] Write observations to D1 from `scheduled()`
 - [ ] Telegram `/gym`
 
 ## Later

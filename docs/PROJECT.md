@@ -45,13 +45,13 @@ Everything else waits until there is data to justify it.
 
 - A local Python prototype that fetches the REBOKS capacity page and prints occupancy,
   capacity, facility ID and timestamp for all four published facilities.
-- A Cloudflare Worker skeleton with the scraper ported to TypeScript, a `/health`
-  endpoint returning live gym occupancy as JSON, and a `scheduled()` handler wired to a
-  15-minute cron. Both entry points run under `wrangler dev`.
+- A Cloudflare Worker whose `scheduled()` handler scrapes REBOKS and writes one row per
+  gym into D1, and whose `/health` endpoint reads the latest rows back out.
+- An `occupancy` table with a single migration.
 - Eight parser tests against a real saved REBOKS response.
 
-Nothing is deployed, and nothing is stored yet — `scheduled()` currently logs instead of
-writing to D1.
+All of it verified locally under `wrangler dev`. Nothing is deployed — that needs a
+Cloudflare account, so no history is accumulating yet.
 
 ## Planned features
 
@@ -91,8 +91,8 @@ writing to D1.
 
 ```
 Stage 0  Investigate REBOKS + build scraper     DONE
-Stage 1  Move scraper into a Cloudflare Worker  IN PROGRESS - runs locally, not deployed
-Stage 2  D1 schema + scheduled collection       not started
+Stage 1  Move scraper into a Cloudflare Worker  DONE - runs locally
+Stage 2  D1 schema + scheduled collection       DONE locally - deploy pending
 Stage 3  Telegram /gym                          not started
 Stage 4  Historical analysis                    blocked on data
 Stage 5  Prediction experiments                 blocked on Stage 4

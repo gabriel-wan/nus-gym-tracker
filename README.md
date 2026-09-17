@@ -15,12 +15,12 @@ Currently tracking:
 
 ## Status
 
-**Stage 1 in progress — the Worker runs locally; nothing is deployed yet.**
+**Collecting into D1 locally. Not deployed yet — that needs a Cloudflare account.**
 
 ```
 [x] Stage 0  Investigate REBOKS, build scraper
-[~] Stage 1  Cloudflare Worker  (scraper ported + tests; not deployed)
-[ ] Stage 2  D1 storage + 15-minute Cron Trigger
+[x] Stage 1  Cloudflare Worker
+[x] Stage 2  D1 storage + cron   (works locally; deploy pending)
 [ ] Stage 3  Telegram /gym
 [ ] Stage 4  Historical analysis
 ```
@@ -31,8 +31,12 @@ The Worker, locally:
 
 ```bash
 npm install
+npx wrangler d1 migrations apply nus-gym-tracker --local
 npm run dev
 ```
+
+The migration only has to be run once. Local development keeps its own SQLite file
+under `.wrangler/`, so none of this needs a Cloudflare account.
 
 Then, in another terminal:
 
@@ -41,8 +45,11 @@ curl http://127.0.0.1:8787/health
 curl "http://127.0.0.1:8787/cdn-cgi/local/scheduled"
 ```
 
-`/health` returns live gym occupancy as JSON. The second URL manually fires the cron
-handler, which is how Wrangler lets you test a scheduled run without waiting 15 minutes.
+The second URL manually fires the cron handler, which is how Wrangler lets you test a
+scheduled run without waiting 15 minutes. It scrapes REBOKS and writes a row per gym.
+
+`/health` then reads those rows back out of D1 — so an empty response means the
+collector has not run, not that the gyms are empty.
 
 REBOKS also publishes two swimming pools. This project parses them but does not track
 them — it is a gym tracker. The Python prototype predates that decision and still prints
@@ -68,8 +75,9 @@ UTown showing `0/120` there is correct — the gym was closed, reopening 18 Sep 
 ```
 src/index.ts        Worker entry: scheduled() + fetch()
 src/reboks.ts       fetch + parse the REBOKS page
+src/db.ts           read/write occupancy history in D1
 tests/              parser tests against a real saved page
-migrations/         D1 schema (empty until Stage 2)
+migrations/         D1 schema
 prototype/          the original Python scraper
 docs/               why things are the way they are
 ```
@@ -102,10 +110,10 @@ The data source is a public, unauthenticated page. No NUS login is involved.
 | [docs/PROJECT.md](docs/PROJECT.md) | What this is, why it exists, decisions, constraints |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the components fit together and why |
 | [docs/DATA-SOURCE.md](docs/DATA-SOURCE.md) | The REBOKS investigation — findings, assumptions, failure modes |
+| [docs/DATABASE.md](docs/DATABASE.md) | Schema, why each column exists, why the index |
 | [docs/TODO.md](docs/TODO.md) | What is next |
 
-`docs/DATABASE.md` and `docs/DEPLOYMENT.md` will be added when D1 and deployment
-actually exist.
+`docs/DEPLOYMENT.md` will be added when there is a deployment to document.
 
 ## A note on the data
 
