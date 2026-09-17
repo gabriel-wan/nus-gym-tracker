@@ -5,7 +5,7 @@ itself does not keep.
 
 NUS publishes live gym occupancy on the REBOKS capacity page, but only as a snapshot —
 there is no history, so you cannot tell whether 7pm is always this bad. This project
-samples that page every 15 minutes, stores the readings, and answers questions over
+samples that page every 5 minutes, stores the readings, and answers questions over
 Telegram.
 
 Currently tracking:
@@ -46,7 +46,7 @@ curl "http://127.0.0.1:8787/cdn-cgi/local/scheduled"
 ```
 
 The second URL manually fires the cron handler, which is how Wrangler lets you test a
-scheduled run without waiting 15 minutes. It scrapes REBOKS and writes a row per gym.
+scheduled run without waiting for the next slot. It scrapes REBOKS and writes a row per gym.
 
 `/health` then reads those rows back out of D1 — so an empty response means the
 collector has not run, not that the gyms are empty.
@@ -94,7 +94,7 @@ docs/               why things are the way they are
 
 ```
 REBOKS capacity page
-        |  scrape every 15 min
+        |  scrape every 5 min
         v
 Cloudflare Worker  -->  D1 (history)
         ^                  |
@@ -126,4 +126,4 @@ because we were told; the page itself showed nothing. See
 ## Etiquette
 
 REBOKS is a university service, not a public API. This project makes one request every
-15 minutes with an honest User-Agent, and does not retry aggressively.
+5 minutes with an honest User-Agent, and does not retry aggressively.

@@ -74,14 +74,14 @@ Deployed to Cloudflare. The bot still needs `setWebhook` pointing at the Worker.
 | Scrape HTML, not JSON | A JSON API is referenced in REBOKS's own JavaScript but every endpoint returns 404, identical to a nonexistent route. See `docs/DATA-SOURCE.md`. |
 | Regex over an HTML parser | The markup is machine-generated, uniform and unnested. Adding a parser dependency would buy nothing. |
 | Python prototype first | Stage 0 is about understanding the data source. Doing that locally avoids learning Cloudflare and REBOKS at the same time. |
-| Cloudflare Workers + D1 | The workload is one request every 15 minutes. Free tier covers it with ~250× headroom, and D1 binds to the Worker with no extra credentials. |
+| Cloudflare Workers + D1 | The workload is one request every 5 minutes. Free tier covers it with ~250× headroom, and D1 binds to the Worker with no extra credentials. |
 | Telegram webhooks, not long polling | Long polling needs an always-on process, which would rule out serverless entirely. |
 | Store `capacity` per observation | Capacity is a property of the moment, not the facility, and appears to change over time. |
 | Store `collected_at`, not `observed_at` | Cron Triggers are not guaranteed to fire on time, so the schedule is not a reliable clock. And REBOKS publishes no observation time - its "Last Updated at" is the page render clock - so collection time is the only honest timestamp we have. |
 | Store UTC | Unambiguous and immune to any future timezone handling mistakes; convert to SGT only for display. |
 | No ML yet | There is no historical data to train or evaluate on. |
-| Sample 06:00-23:59 SGT, not 24/7 | The gyms open 07:00-22:00 SGT, so overnight rows carry no information. An hour of buffer either side captures the opening/closing transitions and tolerates holiday hour changes. Cron Triggers run on UTC, so the window is written shifted back 8 hours. |
-| Serve `/gym` from D1, not a live scrape | With several users, scraping on every message would multiply load on a university server. Reading the latest stored row keeps REBOKS at a steady 4 requests/hour regardless of user count, and replies are instant. |
+| Sample every 5 min, 06:00-23:59 SGT | The gyms open 07:00-22:00 SGT, so overnight rows carry no information. An hour of buffer either side captures the opening/closing transitions and tolerates holiday hour changes. Cron Triggers run on UTC, so the window is written shifted back 8 hours. |
+| Serve `/gym` from D1, not a live scrape | With several users, scraping on every message would multiply load on a university server. Reading the latest stored row keeps REBOKS at a steady 12 requests/hour regardless of user count, and replies are instant. |
 | Design for multiple users from the start | The bot will be shared with a small group and may grow. `/gym` is stateless so it scales for free; `/alert` will need a per-user table later. Cheap to allow for now, annoying to retrofit. |
 | Track gyms only, not pools | This is a gym tracker. REBOKS publishes two pools; we parse them (that is what the `gymbox`/`swimbox` class is for) but do not store them, because unused rows are noise. Filtering on `kind` rather than a fixed ID list means a third gym would be picked up automatically. |
 | `wrangler.toml`, not `wrangler.jsonc` | Cloudflare recommends JSON for new projects, but TOML is fully supported and takes comments, which is worth more here than access to config-only features we do not use. |
@@ -116,7 +116,7 @@ Stage 5  Prediction experiments                 blocked on Stage 4
   out, so it likely over-reports, increasingly so through the day. Present it as
   reported occupancy and lean on the gym-vs-gym comparison, which is counted the same
   way on both sides. See `docs/DATA-SOURCE.md`.
-- **Be a polite client.** One request per 15 minutes, honest User-Agent, no retry storms.
+- **Be a polite client.** One request per 5 minutes, honest User-Agent, no retry storms.
   REBOKS is a university service, not an API product.
 - **No secrets in the repository.** The Telegram bot token goes in Wrangler secrets.
 - **Minimal dependencies.** Every added dependency needs a justification.

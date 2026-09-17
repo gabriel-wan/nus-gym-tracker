@@ -18,8 +18,8 @@ const GYM_NAMES: Record<number, string> = {
 const OPEN_HOUR = 7;
 const CLOSE_HOUR = 22;
 
-/** A reading older than this, while the gyms are open, is worth flagging. */
-const STALE_AFTER_MINUTES = 30;
+/** Three missed runs at 5-minute sampling. Worth flagging while open. */
+const STALE_AFTER_MINUTES = 15;
 
 /**
  * Crowd bands. These are our labels for the sake of a readable message - NUS
@@ -182,7 +182,7 @@ export function helpMessage(): string {
     "/about - how the data is collected",
     "/help - show commands",
     "",
-    "Data comes from NUS REBOKS, sampled every 15 minutes while the gyms are open.",
+    "Data comes from NUS REBOKS, sampled every 5 minutes while the gyms are open.",
   ].join("\n");
 }
 
@@ -191,7 +191,7 @@ export function aboutMessage(): string {
   return [
     "\u{1F3CB} NUS Gym Tracker",
     "",
-    `Readings come from the public NUS REBOKS capacity page, collected every 15 minutes while the gyms are open (${OPEN_HOUR}am-${CLOSE_HOUR - 12}pm daily).`,
+    `Readings come from the public NUS REBOKS capacity page, collected every 5 minutes while the gyms are open (${OPEN_HOUR}am-${CLOSE_HOUR - 12}pm daily).`,
     "",
     "What the number is not:",
     "Entry is by QR scan, and people often forget to scan out. The count is really 'scanned in and not yet scanned out', so it tends to read higher than the number of people actually in the gym.",

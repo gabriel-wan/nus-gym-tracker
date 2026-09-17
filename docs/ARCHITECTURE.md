@@ -17,7 +17,7 @@ find out whether the data source is usable at all before committing to a stack.
 ```
         REBOKS capacity page
                  |
-                 |  HTTPS GET, every 15 minutes
+                 |  HTTPS GET, every 5 minutes
                  v
    Cron Trigger --> Cloudflare Worker --> D1 (occupancy history)
                           ^                     |
@@ -38,17 +38,18 @@ REBOKS publishes a snapshot and no history. Nobody is storing this data over tim
 if we want to answer "when is the gym quiet?" we have to build the history ourselves.
 The Cron Trigger is what turns a one-off reading into a time series.
 
-15 minutes is the starting interval. It is frequent enough to capture how crowding rises
-and falls across an evening, and cheap enough to be irrelevant against any quota.
+Sampling runs every 5 minutes. 15 was the original interval and was adequate for "should
+I go now", but the finer grid gives the historical work a much better curve to fit, and
+the cost is still negligible: 216 samples a day against a 100,000-request allowance.
 
 The gyms open 07:00–22:00 SGT, so there is nothing to learn overnight — the cron runs
-06:00–23:59 SGT only, which is 72 samples a day instead of 96. The hour of buffer at
+06:00–23:59 SGT only, which is 216 samples a day rather than 288. The hour of buffer at
 each end is deliberate: it captures the opening and closing transitions, and it means a
 holiday or exam-period change to the hours still lands inside the window instead of
 silently falling outside it.
 
 Because Cron Triggers execute on **UTC**, that window is written shifted back 8 hours
-(`*/15 0-15,22-23 * * *`). Getting this wrong would silently sample the wrong half of
+(`*/5 0-15,22-23 * * *`). Getting this wrong would silently sample the wrong half of
 the day, so `wrangler.toml` spells out the conversion.
 
 **Scheduled runs are not precise.** Cloudflare does not guarantee a cron fires at exactly
@@ -78,7 +79,7 @@ occupancy at Thursday 7pm"), which is exactly what SQL is good at.
 D1 also protects REBOKS once the bot has more than one user. If `/gym` scraped REBOKS on
 every message, ten people checking at 6pm would mean ten requests to a university server
 that owes us nothing. Serving `/gym` from the most recent stored row instead means
-REBOKS sees a steady 4 requests an hour no matter how many people use the bot — and
+REBOKS sees a steady 12 requests an hour no matter how many people use the bot — and
 users get an instant reply rather than waiting on a round trip to NUS.
 
 ### Telegram webhook (not long polling)
@@ -99,15 +100,15 @@ Verified against Cloudflare's official documentation, not third-party summaries:
 
 | Limit (Workers/D1 Free) | Official value | Our expected usage |
 |---|---|---|
-| Worker requests | 100,000 / day | ~96 cron runs + a handful of bot messages |
+| Worker requests | 100,000 / day | 216 cron runs + bot messages |
 | CPU time per invocation | 10 ms | regex over 16 KB is far below this |
 | Cron Triggers | 5 per account | 1 |
-| D1 rows written | 100,000 / day | 4 facilities × 96 = **384** |
+| D1 rows written | 100,000 / day | 2 gyms × 216 = **432** |
 | D1 rows read | 5 million / day | trivial |
-| D1 storage | 5 GB per account | ~10 MB per year of history |
+| D1 storage | 5 GB per account | ~12 MB per year of history |
 | D1 queries per invocation | 50 | 1 batched insert |
 
-The headroom is roughly 250× on the tightest limit (rows written). Note that waiting on
+The headroom is roughly 230× on the tightest limit (rows written). Note that waiting on
 the REBOKS response is I/O, not CPU, so it does not count against the 10 ms CPU budget.
 
 Sources: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/),
@@ -117,5 +118,5 @@ Sources: [Workers limits](https://developers.cloudflare.com/workers/platform/lim
 ## Deliberate non-goals
 
 No Docker, no queues, no Redis, no CI/CD, no auth, no frontend. The workload is one HTTP
-request every 15 minutes. Anything more than a Worker and a table would be architecture
+request every 5 minutes. Anything more than a Worker and a table would be architecture
 for its own sake.

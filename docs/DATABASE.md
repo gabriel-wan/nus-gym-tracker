@@ -18,8 +18,8 @@ CREATE INDEX idx_occupancy_facility_time
   ON occupancy (facility_id, collected_at);
 ```
 
-One row per gym per scrape. Two gyms, 72 scrapes a day, so 144 rows a day and roughly
-53,000 a year.
+One row per gym per scrape. Two gyms, 216 scrapes a day, so 432 rows a day and roughly
+158,000 a year.
 
 ## Why each column exists
 
@@ -82,7 +82,7 @@ Both of our query shapes are "one gym, ordered by time":
 A composite index on `(facility_id, collected_at)` serves both: it narrows to the gym
 first, then the rows are already in time order within that group, so there is no sort.
 
-It is worth saying that at 53,000 rows a year SQLite would scan the whole table quickly
+It is worth saying that at 158,000 rows a year SQLite would scan the whole table quickly
 enough that nobody would notice. The index is justified by the access pattern being
 obvious and unchanging, not by the row count. If the queries were varied or unknown, the
 right call would be to add no index yet and wait for a slow one.

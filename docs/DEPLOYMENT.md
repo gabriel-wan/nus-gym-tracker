@@ -124,10 +124,10 @@ npx wrangler d1 execute nus-gym-tracker --remote \
 
 ```toml
 [triggers]
-crons = ["*/15 0-15,22-23 * * *"]
+crons = ["*/5 0-15,22-23 * * *"]
 ```
 
-Every 15 minutes, during UTC hours 0–15 and 22–23, which is 06:00–23:59 Singapore time.
+Every 5 minutes, during UTC hours 0–15 and 22–23, which is 06:00–23:59 Singapore time.
 **Cron Triggers run on UTC**, so the Singapore window has to be written shifted back
 8 hours. See `docs/ARCHITECTURE.md`.
 
@@ -135,4 +135,4 @@ A newly registered trigger does not necessarily fire at the very next quarter ho
 it a cycle or two before concluding something is broken, and check `npx wrangler tail`.
 
 Cloudflare does not guarantee a cron fires exactly on time, and runs can be skipped, so
-rows are stamped with the observed time rather than the scheduled one.
+rows are stamped with the collection time rather than the scheduled one.
