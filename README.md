@@ -99,12 +99,12 @@ The data source is a public, unauthenticated page. No NUS login is involved.
 
 | File | Contents |
 |---|---|
-| [docs/project.md](docs/project.md) | What this is, why it exists, decisions, constraints |
-| [docs/architecture.md](docs/architecture.md) | How the components fit together and why |
-| [docs/data-source.md](docs/data-source.md) | The REBOKS investigation — findings, assumptions, failure modes |
+| [docs/PROJECT.md](docs/PROJECT.md) | What this is, why it exists, decisions, constraints |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the components fit together and why |
+| [docs/DATA-SOURCE.md](docs/DATA-SOURCE.md) | The REBOKS investigation — findings, assumptions, failure modes |
 | [docs/TODO.md](docs/TODO.md) | What is next |
 
-`docs/database.md` and `docs/deployment.md` will be added when D1 and deployment
+`docs/DATABASE.md` and `docs/DEPLOYMENT.md` will be added when D1 and deployment
 actually exist.
 
 ## A note on the data
@@ -113,7 +113,7 @@ A reading of `0` cannot be trusted on its own. The page gives no way to distingu
 "closed" from "empty" from "the counter is offline" — UTown reported `0/120` at peak
 evening while USC was at 99%. That case turned out to be a genuine closure, but only
 because we were told; the page itself showed nothing. See
-[docs/data-source.md](docs/data-source.md).
+[docs/DATA-SOURCE.md](docs/DATA-SOURCE.md).
 
 ## Etiquette
 

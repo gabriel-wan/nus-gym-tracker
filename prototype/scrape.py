@@ -2,7 +2,7 @@
 
 This is a throwaway learning prototype, deliberately kept separate from the
 eventual Cloudflare Worker. It has one job: prove we can get correct numbers
-out of REBOKS. See docs/data-source.md for what we found and why.
+out of REBOKS. See docs/DATA-SOURCE.md for what we found and why.
 
 Run:  python prototype/scrape.py
 """

@@ -69,7 +69,7 @@ writing to D1.
 
 | Decision | Reasoning |
 |---|---|
-| Scrape HTML, not JSON | A JSON API is referenced in REBOKS's own JavaScript but every endpoint returns 404, identical to a nonexistent route. See `docs/data-source.md`. |
+| Scrape HTML, not JSON | A JSON API is referenced in REBOKS's own JavaScript but every endpoint returns 404, identical to a nonexistent route. See `docs/DATA-SOURCE.md`. |
 | Regex over an HTML parser | The markup is machine-generated, uniform and unnested. Adding a parser dependency would buy nothing. |
 | Python prototype first | Stage 0 is about understanding the data source. Doing that locally avoids learning Cloudflare and REBOKS at the same time. |
 | Cloudflare Workers + D1 | The workload is one request every 15 minutes. Free tier covers it with ~250× headroom, and D1 binds to the Worker with no extra credentials. |
@@ -110,6 +110,10 @@ Stage 5  Prediction experiments                 blocked on Stage 4
   110), so raw numbers are not comparable.
 - **Gym opening hours are 07:00-22:00 SGT, daily.** Readings outside those hours are
   closure, not demand.
+- **The number is a QR-scan proxy, not a headcount.** People scan in but usually not
+  out, so it likely over-reports, increasingly so through the day. Present it as
+  reported occupancy and lean on the gym-vs-gym comparison, which is counted the same
+  way on both sides. See `docs/DATA-SOURCE.md`.
 - **Be a polite client.** One request per 15 minutes, honest User-Agent, no retry storms.
   REBOKS is a university service, not an API product.
 - **No secrets in the repository.** The Telegram bot token goes in Wrangler secrets.

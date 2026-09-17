@@ -135,6 +135,43 @@ would be indistinguishable from "every gym is empty" and would poison the histor
 When this moves into the Worker, Cloudflare's built-in `HTMLRewriter` is an alternative
 that needs no dependency. That decision belongs to the Worker stage, not now.
 
+## What the number actually measures
+
+Entry to each gym is by QR scan, and the displayed figure changes when someone scans.
+So it is **not a headcount** — it is the number of people who have scanned in and not
+yet scanned out.
+
+Two sources of error, pulling opposite ways but not equally:
+
+- People sometimes forget to scan in, which **undercounts**.
+- People usually do not scan out, which **overcounts** — and this is the bigger effect.
+
+So the reported figure probably runs **higher** than the number of people actually in
+the gym, and the gap likely widens through the day.
+
+One caveat against assuming it only ever climbs: USC was observed going 110 -> 109 ->
+108 -> 107 over a few minutes on 2026-09-17, so exits do get recorded some of the time.
+The bias is upward drift, not a pure ratchet.
+
+### Two things this makes testable
+
+**Does the count reset at closing?** It plausibly must, or it would climb indefinitely.
+The sampling window runs to 23:59 and resumes at 06:00 SGT, which brackets closing time,
+so a few days of data will show it directly. If it does reset, a `0` at 07:00 is a reset
+artifact rather than a measurement.
+
+**Does the count clamp at capacity?** At 20:38 on 2026-09-17, USC read exactly `110/110`.
+If the counter is capped at the published capacity, then `110/110` means "110 or more"
+and a full gym is indistinguishable from an overfull one. Frequent exact-capacity
+readings in the history would confirm it.
+
+### What this means for the bot
+
+Do not present the number as fact. `109/110` is *reported* occupancy, not "there are 109
+people in there". The comparison **between** the two gyms is more trustworthy than either
+absolute figure, since both are counted the same way — another reason `/gym` should lead
+with percentages and with which gym is quieter, rather than raw headcount.
+
 ## What happens when a facility is closed
 
 Observed at **01:57 SGT** (all facilities shut): every facility still appears, with
@@ -179,7 +216,8 @@ works and that our reading of `0` was right. Worth deploying before that.
 1. The page stays publicly reachable without authentication.
 2. Facility IDs are stable over time.
 3. The one-line `<div class='...box' id='...'>` markup stays uniform.
-4. Numbers reflect a real people-counting system (turnstiles or similar), not estimates.
+4. Numbers come from QR scans at entry, so they are a proxy for occupancy rather than
+   a measurement of it (see above).
 5. Reported times are Singapore local time (UTC+8).
 
 ## Limitations

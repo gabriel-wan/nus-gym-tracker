@@ -25,7 +25,7 @@ export default {
    *
    * `controller.scheduledTime` is when the run was *meant* to happen. We ignore
    * it and stamp rows with the real time instead, because Cloudflare does not
-   * guarantee crons fire on schedule. See docs/architecture.md.
+   * guarantee crons fire on schedule. See docs/ARCHITECTURE.md.
    */
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     const observations = await observe();

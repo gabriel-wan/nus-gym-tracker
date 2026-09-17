@@ -27,7 +27,7 @@ compatibility_date = "2026-09-17"
 #
 # Cloudflare does not guarantee a cron fires exactly on time, and runs can be
 # delayed or skipped, so rows are stamped with the observed time rather than
-# the scheduled time. See docs/architecture.md.
+# the scheduled time. See docs/ARCHITECTURE.md.
 # https://developers.cloudflare.com/workers/configuration/cron-triggers/
 [triggers]
 crons = ["*/15 0-15,22-23 * * *"]

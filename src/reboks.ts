@@ -1,7 +1,7 @@
 /**
  * Fetching and parsing the public REBOKS capacity page.
  *
- * This is a direct port of prototype/scrape.py. See docs/data-source.md for
+ * This is a direct port of prototype/scrape.py. See docs/DATA-SOURCE.md for
  * why we parse HTML rather than calling a JSON API.
  */
 

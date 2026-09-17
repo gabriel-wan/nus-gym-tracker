@@ -23,5 +23,7 @@
 ## Open questions
 - [x] Why did UTown read `0/120` all evening on 2026-09-17? Closed; reopens 18 Sep 2026
 - [ ] Are facility IDs stable over months?
-- [ ] How often does NUS's people-counter actually update? (affects whether 15 min is right)
+- [x] How does the counter work? QR scan at entry; exits often not scanned
+- [ ] Does the count reset at closing? (bracketed by the sampling window)
+- [ ] Does the count clamp at capacity? (watch for repeated exact-capacity readings)
 - [ ] Do the `facility/gymnumber` JSON endpoints ever come back? (re-test occasionally)
