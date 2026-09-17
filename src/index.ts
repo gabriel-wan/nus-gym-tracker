@@ -8,13 +8,24 @@
 
 import { insertObservations, latestReadings } from "./db";
 import { observe, percentFull } from "./reboks";
+import {
+  formatGymMessage,
+  helpMessage,
+  parseCommand,
+  sendMessage,
+  type TelegramUpdate,
+} from "./telegram";
 
 export interface Env {
   DB: D1Database;
 
-  // Stage 3: set with `wrangler secret put TELEGRAM_BOT_TOKEN`, never in the repo.
-  // TELEGRAM_BOT_TOKEN: string;
+  // Both set with `wrangler secret put`, never in the repo.
+  TELEGRAM_BOT_TOKEN: string;
+  TELEGRAM_WEBHOOK_SECRET: string;
 }
+
+/** Where Telegram posts updates. Told to Telegram once, via setWebhook. */
+const WEBHOOK_PATH = "/telegram";
 
 export default {
   /**
@@ -45,6 +56,10 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
+    if (request.method === "POST" && url.pathname === WEBHOOK_PATH) {
+      return handleTelegramUpdate(request, env);
+    }
+
     if (url.pathname === "/health") {
       const readings = await latestReadings(env.DB);
 
@@ -65,3 +80,48 @@ export default {
     });
   },
 } satisfies ExportedHandler<Env>;
+
+/**
+ * Handle one Telegram update.
+ *
+ * The webhook URL is public, so the first thing to establish is that Telegram
+ * really sent this. Telegram echoes back the secret we gave it at setWebhook
+ * time in a header; anything else is someone poking at the URL.
+ *
+ * We always answer 200 once the request is authentic, including for commands we
+ * do not know. A non-200 makes Telegram retry the same update repeatedly.
+ */
+async function handleTelegramUpdate(request: Request, env: Env): Promise<Response> {
+  const sent = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
+  if (sent !== env.TELEGRAM_WEBHOOK_SECRET) {
+    return new Response("forbidden", { status: 403 });
+  }
+
+  const update = (await request.json()) as TelegramUpdate;
+  const chatId = update.message?.chat.id;
+  const command = parseCommand(update.message?.text);
+
+  if (chatId === undefined || command === null) {
+    return new Response("ok");
+  }
+
+  const reply = await replyTo(command, env);
+  if (reply !== null) {
+    await sendMessage(env.TELEGRAM_BOT_TOKEN, chatId, reply);
+  }
+
+  return new Response("ok");
+}
+
+/** null means "say nothing", which is the right response to an unknown command. */
+async function replyTo(command: string, env: Env): Promise<string | null> {
+  switch (command) {
+    case "/gym":
+      return formatGymMessage(await latestReadings(env.DB), new Date());
+    case "/start":
+    case "/help":
+      return helpMessage();
+    default:
+      return null;
+  }
+}
