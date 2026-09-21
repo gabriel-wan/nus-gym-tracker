@@ -334,9 +334,9 @@ export function startMessage(): string {
     "Check how busy the NUS gyms are before you head down.",
     "",
     "/gym — current crowd levels",
-    "/history — how today has looked",
-    "/about — where the numbers come from",
-    "/help — all commands",
+    "/history — today's crowd levels",
+    "/about — how the numbers work",
+    "/help — available commands",
   ].join("\n");
 }
 
@@ -346,9 +346,9 @@ export function helpMessage(): string {
     HEADER,
     "",
     "/gym — current crowd levels",
-    "/history — how today has looked",
-    "/about — how the data is collected",
-    "/help — show commands",
+    "/history — today's crowd levels",
+    "/about — how the numbers work",
+    "/help — available commands",
   ].join("\n");
 }
 
