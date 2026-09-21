@@ -88,3 +88,26 @@ export async function newestCollectedAt(db: D1Database): Promise<string | null> 
     .first<{ newest: string | null }>();
   return row?.newest ?? null;
 }
+
+/**
+ * Every reading collected at or after a given time, oldest first.
+ *
+ * Used by /history. Bounded by the caller to one day, so this is a few hundred
+ * rows and the (facility_id, collected_at) index covers the scan.
+ */
+export async function readingsSince(db: D1Database, since: string): Promise<Reading[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT collected_at  AS collectedAt,
+              facility_id   AS facilityId,
+              facility_name AS facilityName,
+              occupancy     AS occupancy,
+              capacity      AS capacity
+       FROM occupancy
+       WHERE collected_at >= ?
+       ORDER BY collected_at`,
+    )
+    .bind(since)
+    .all<Reading>();
+  return results;
+}

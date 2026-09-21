@@ -35,9 +35,10 @@ On 2026-09-17 at 20:38 the USC gym was at 109/110 — useful to know before walk
 
 ## Current goals
 
-1. Reliably read live occupancy from REBOKS. **(done — Stage 0)**
-2. Collect it automatically so history accumulates.
-3. Expose the current reading over Telegram via `/gym`.
+1. Reliably read live occupancy from REBOKS. **(done)**
+2. Collect it automatically so history accumulates. **(done)**
+3. Expose it over Telegram via `/gym` and `/history`. **(done)**
+4. Accumulate enough history to test whether prediction beats a simple baseline.
 
 Everything else waits until there is data to justify it.
 
@@ -48,11 +49,12 @@ Everything else waits until there is data to justify it.
 - A Cloudflare Worker whose `scheduled()` handler scrapes REBOKS and writes one row per
   gym into D1, and whose `/health` endpoint reads the latest rows back out.
 - An `occupancy` table with a single migration.
-- A Telegram webhook that answers `/gym`, `/start` and `/help`, rejecting anything that
-  does not carry the shared secret.
-- 21 tests: REBOKS parsing against a real saved page, and the bot's replies.
+- A Telegram webhook answering `/gym`, `/history`, `/start`, `/help` and `/about`,
+  rejecting anything that does not carry the shared secret.
+- 58 tests: REBOKS parsing against a real saved page, bot message formatting, and
+  the D1 and webhook layers running inside workerd.
 
-Deployed to Cloudflare. The bot still needs `setWebhook` pointing at the Worker.
+Deployed and collecting since 18 September 2026.
 
 ## Planned features
 
@@ -60,12 +62,13 @@ Deployed to Cloudflare. The bot still needs `setWebhook` pointing at the Worker.
 |---|---|---|
 | `/gym` | current occupancy for both gyms | done |
 | `/start` `/help` `/about` | onboarding, commands, data caveats | done |
-| `/history` | recent trend, last 6-12 hours | a day or two of collected data |
+| `/history` | today's shape, both gyms | done |
 | `/best` | quietest time today | historical patterns |
 | `/predict` | occupancy 30/60/90 min ahead | modelling, and a baseline to beat |
 | `/alert` | notify when a gym drops below a threshold | per-user state |
 
-`/gym` is the only one in scope now. The rest are blocked on data we do not have yet.
+`/best` and `/predict` are blocked on data: there are still no Tuesday, Wednesday or
+Thursday readings, and a day-of-week baseline needs roughly four weeks.
 
 ## Technical decisions
 
@@ -79,7 +82,10 @@ Deployed to Cloudflare. The bot still needs `setWebhook` pointing at the Worker.
 | Store `capacity` per observation | Capacity is a property of the moment, not the facility, and appears to change over time. |
 | Store `collected_at`, not `observed_at` | Cron Triggers are not guaranteed to fire on time, so the schedule is not a reliable clock. And REBOKS publishes no observation time - its "Last Updated at" is the page render clock - so collection time is the only honest timestamp we have. |
 | Store UTC | Unambiguous and immune to any future timezone handling mistakes; convert to SGT only for display. |
-| No ML yet | There is no historical data to train or evaluate on. |
+| No ML yet | Revisit in mid-October. The limit is not rows but weeks: there are only ~105 distinct (day, hour) situations and one fresh observation of each per week. |
+| Messages use `parse_mode: HTML` | Bold copy needs a parse mode, and `<pre>` is the only way to get aligned bars in `/history` - Telegram's default font is proportional. HTML over MarkdownV2 because it escapes three characters rather than eighteen. |
+| Hide counts outside opening hours | After 22:00 the REBOKS counter freezes on its last value, so any number shown would describe an empty building. Forcing a `0` was rejected: that is a figure REBOKS never reported. Better to show nothing than to invent. |
+| `/history` buckets anchor to 07:00 | Anchoring to even hours labelled the 07:00 readings as 06:00 - an hour when the gym is shut and every reading is a pre-reset zero. |
 | Sample every 5 min, 06:00-23:59 SGT | The gyms open 07:00-22:00 SGT, so overnight rows carry no information. An hour of buffer either side captures the opening/closing transitions and tolerates holiday hour changes. Cron Triggers run on UTC, so the window is written shifted back 8 hours. |
 | Serve `/gym` from D1, not a live scrape | With several users, scraping on every message would multiply load on a university server. Reading the latest stored row keeps REBOKS at a steady 12 requests/hour regardless of user count, and replies are instant. |
 | Design for multiple users from the start | The bot will be shared with a small group and may grow. `/gym` is stateless so it scales for free; `/alert` will need a per-user table later. Cheap to allow for now, annoying to retrofit. |

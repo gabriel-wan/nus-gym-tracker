@@ -1,8 +1,13 @@
 /**
  * Telegram bot: understanding incoming updates and writing the replies.
  *
- * Everything here except sendMessage() is a pure function, so the bot's
- * behaviour can be tested without a bot token or a network.
+ * Messages are sent with parse_mode HTML, so every value interpolated into one
+ * must go through escapeHtml(). HTML rather than MarkdownV2 because it needs
+ * three characters escaped instead of eighteen, and the copy is full of `.`,
+ * `-` and `(`.
+ *
+ * Everything except sendMessage() is a pure function, so the bot's behaviour is
+ * testable without a bot token or a network.
  */
 
 import type { Reading } from "./db";
@@ -14,7 +19,14 @@ const GYM_NAMES: Record<number, string> = {
   39: "USC Gym",
 };
 
-/** Gym opening hours, Singapore time. */
+/**
+ * Gym opening hours, Singapore time.
+ *
+ * These bound what we *show*, not what we collect. The cron runs 06:00-23:59 to
+ * catch the opening transition and any change to the hours - but after 22:00 the
+ * REBOKS counter freezes on its last value until an overnight reset, so those
+ * readings describe an empty building and must never reach a chart.
+ */
 const OPEN_HOUR = 7;
 const CLOSE_HOUR = 22;
 
@@ -22,12 +34,17 @@ const CLOSE_HOUR = 22;
 const STALE_AFTER_MINUTES = 15;
 
 /**
- * Crowd bands. These are our labels for the sake of a readable message - NUS
- * publishes no definition of "busy", so nothing here should be presented as
- * official.
+ * Crowd bands. Our labels for the sake of a scannable message - NUS publishes no
+ * definition of "busy", so nothing here should be presented as official.
  */
 const BUSY_PERCENT = 70;
 const MODERATE_PERCENT = 40;
+
+/** Width of a /history bar, in characters. */
+const BAR_WIDTH = 10;
+
+/** Hours per /history bucket. Two keeps both gyms inside one readable message. */
+const BUCKET_HOURS = 2;
 
 /**
  * The slice of Telegram's Update object we actually use. Telegram sends far
@@ -38,6 +55,11 @@ export interface TelegramUpdate {
     chat: { id: number };
     text?: string;
   };
+}
+
+/** Telegram's HTML parse mode needs exactly these three escaped. */
+export function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /**
@@ -53,8 +75,8 @@ export function parseCommand(text: string | undefined): string | null {
 }
 
 /** Hour of day in Singapore. The Worker's clock is always UTC. */
-function sgtHour(now: Date): number {
-  return (now.getUTCHours() + 8) % 24;
+function sgtHour(date: Date): number {
+  return (date.getUTCHours() + 8) % 24;
 }
 
 function isOpen(now: Date): boolean {
@@ -67,8 +89,7 @@ function gymName(reading: Reading): string {
 }
 
 function minutesAgo(collectedAt: string, now: Date): number {
-  const elapsed = now.getTime() - new Date(collectedAt).getTime();
-  return Math.max(0, Math.round(elapsed / 60000));
+  return Math.max(0, Math.round((now.getTime() - Date.parse(collectedAt)) / 60000));
 }
 
 function describeAge(minutes: number): string {
@@ -78,48 +99,33 @@ function describeAge(minutes: number): string {
   return `Updated about ${hours} hour${hours === 1 ? "" : "s"} ago`;
 }
 
-/**
- * One gym, two lines.
- *
- * A zero gets a white circle rather than a green one. Green would read as
- * "wonderfully empty, go now", when 0 almost always means the gym is shut.
- */
-function gymBlock(reading: Reading, lagging: boolean): string {
-  const pct = percentFull(reading);
-  const counts = `${reading.occupancy} / ${reading.capacity}`;
-  // A gym whose own reading is much older than the other's must say so here,
-  // because the single "Updated" line below cannot describe both honestly.
-  const suffix = lagging ? " · older reading" : "";
-
-  if (reading.occupancy === 0) {
-    return `${gymName(reading)}\n⚪ ${counts} · closed or empty${suffix}`;
-  }
-
-  // capacity 0 would make a percentage meaningless rather than zero.
-  if (pct === null) {
-    return `${gymName(reading)}\n⚪ ${counts} · capacity unknown${suffix}`;
-  }
-
-  const icon =
-    pct >= BUSY_PERCENT
-      ? "\u{1F534}"
-      : pct >= MODERATE_PERCENT
-        ? "\u{1F7E1}"
-        : "\u{1F7E2}";
-
-  return `${gymName(reading)}\n${icon} ${counts} · ${pct.toFixed(0)}% full${suffix}`;
+function marker(pct: number | null, occupancy: number): string {
+  // A zero gets a neutral circle, never green. Green reads as "wonderfully
+  // empty, go now" when 0 almost always means shut.
+  if (occupancy === 0 || pct === null) return "⚪";
+  if (pct >= BUSY_PERCENT) return "\u{1F534}";
+  if (pct >= MODERATE_PERCENT) return "\u{1F7E1}";
+  return "\u{1F7E2}";
 }
 
+const CLOSED_NOTICE = [
+  "Both gyms are closed.",
+  `Open ${OPEN_HOUR}am–${CLOSE_HOUR - 12}pm daily.`,
+].join("\n");
+
+const SCAN_CAVEAT =
+  "⚠️ Counts are based on QR scans and may be higher than the actual number of people inside.\n/about for more info.";
+
+const HEADER = "\u{1F3CB} <b>NUS Gym Tracker</b>";
+
 /**
- * The line that actually answers "should I go now".
+ * The line that answers "which one should I go to".
  *
  * A gym reading 0 is not evidence that it is quiet - it is more often closed.
  * Calling it "quieter" would be the most misleading thing this bot could say,
  * so that case is handled before any comparison.
  */
-function verdict(readings: Reading[], now: Date): string | null {
-  if (!isOpen(now)) return `Both gyms are closed. They open at ${OPEN_HOUR}am.`;
-
+function verdict(readings: Reading[]): string | null {
   const open = readings.filter((r) => r.occupancy > 0);
   if (open.length === 0) return "Both read 0, which usually means closed.";
   if (open.length === 1) return `Only ${gymName(open[0])} looks open right now.`;
@@ -135,9 +141,15 @@ function verdict(readings: Reading[], now: Date): string | null {
 
 /** The reply to /gym. */
 export function formatGymMessage(readings: Reading[], now: Date): string {
+  // Outside opening hours the stored number is a frozen leftover from before
+  // closing. Showing it - even labelled - invites reading it as occupancy.
+  if (!isOpen(now)) {
+    return `${HEADER}\n\n${CLOSED_NOTICE}`;
+  }
+
   if (readings.length === 0) {
     return [
-      "\u{1F3CB} NUS Gym Tracker",
+      HEADER,
       "",
       "No readings yet.",
       "",
@@ -147,36 +159,136 @@ export function formatGymMessage(readings: Reading[], now: Date): string {
   }
 
   // Each gym's row is fetched independently, so a failed insert can leave one
-  // gym fresh and the other hours old. Age everything by the OLDEST reading:
+  // fresh and the other hours old. Age everything by the OLDEST reading:
   // understating freshness is safe, overstating it is the lie worth avoiding.
   const ages = new Map(readings.map((r) => [r.facilityId, minutesAgo(r.collectedAt, now)]));
-  const oldest = Math.max(...ages.values());
   const freshest = Math.min(...ages.values());
+  const oldest = Math.max(...ages.values());
 
-  // Quietest first: the whole point of the message is where to go.
-  const ordered = [...readings].sort(
+  const lines = [HEADER, ""];
+
+  for (const reading of [...readings].sort(
     (a, b) => (percentFull(a) ?? 0) - (percentFull(b) ?? 0),
-  );
-
-  const lines = ["\u{1F3CB} NUS Gym Tracker", ""];
-  for (const reading of ordered) {
+  )) {
+    const pct = percentFull(reading);
     const lagging = (ages.get(reading.facilityId) ?? 0) - freshest > STALE_AFTER_MINUTES;
-    lines.push(gymBlock(reading, lagging), "");
+
+    lines.push(`<b>${escapeHtml(gymName(reading))}</b>`);
+    lines.push(
+      `${marker(pct, reading.occupancy)} ${reading.occupancy} / ${reading.capacity}` +
+        (pct === null ? " · capacity unknown" : ` · ${pct.toFixed(0)}%`) +
+        (lagging ? " · older reading" : ""),
+    );
+    lines.push("");
   }
 
-  const call = verdict(readings, now);
-  if (call) lines.push(call);
+  const call = verdict(readings);
+  if (call) lines.push(escapeHtml(call));
 
-  const age = oldest;
-  lines.push(describeAge(age));
-
-  // Only suspect a stuck collector while the gyms are open. Overnight the cron
-  // is deliberately idle, and a warning every morning is one you learn to skip.
-  if (age > STALE_AFTER_MINUTES && isOpen(now)) {
-    lines.push("⚠ Data may be stale - the collector may be stuck.");
+  lines.push(describeAge(oldest));
+  if (oldest > STALE_AFTER_MINUTES) {
+    lines.push("⚠️ Data may be stale — the collector may be stuck.");
   }
 
-  lines.push("", "⚠ Counts come from entry scans and may read high. /about");
+  lines.push("", SCAN_CAVEAT);
+  return lines.join("\n").trim();
+}
+
+interface Bucket {
+  startHour: number;
+  percent: number;
+}
+
+/**
+ * Average percentage per BUCKET_HOURS block, Singapore time.
+ *
+ * Only 07:00-22:00 is bucketed. Readings outside that are either the pre-opening
+ * zeros or the frozen post-closing value, and both would distort the shape.
+ */
+export function bucketByHour(readings: Reading[]): Bucket[] {
+  const totals = new Map<number, { sum: number; count: number }>();
+
+  for (const reading of readings) {
+    const collected = new Date(reading.collectedAt);
+    const hour = sgtHour(collected);
+    if (hour < OPEN_HOUR || hour >= CLOSE_HOUR) continue;
+
+    const pct = percentFull(reading);
+    if (pct === null) continue;
+
+    // Buckets are anchored to opening time, not to even hours. Anchoring to
+    // even hours would label the 07:00 readings as 06:00 - an hour when the
+    // gym is shut and every reading is a pre-reset zero.
+    const start = OPEN_HOUR + Math.floor((hour - OPEN_HOUR) / BUCKET_HOURS) * BUCKET_HOURS;
+    const bucket = totals.get(start) ?? { sum: 0, count: 0 };
+    bucket.sum += pct;
+    bucket.count += 1;
+    totals.set(start, bucket);
+  }
+
+  return [...totals.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([startHour, { sum, count }]) => ({ startHour, percent: sum / count }));
+}
+
+function bar(percent: number): string {
+  const filled = Math.min(BAR_WIDTH, Math.max(0, Math.round((percent / 100) * BAR_WIDTH)));
+  return "█".repeat(filled) + "░".repeat(BAR_WIDTH - filled);
+}
+
+function chartFor(buckets: Bucket[]): string {
+  return buckets
+    .map((b) => `${String(b.startHour).padStart(2, "0")}:00  ${bar(b.percent)}  ${String(Math.round(b.percent)).padStart(3)}%`)
+    .join("\n");
+}
+
+/**
+ * The reply to /history: today's shape for both gyms.
+ *
+ * Both, deliberately. The point of this project is choosing between them, and
+ * making someone send a second command to see the other one breaks that.
+ */
+export function formatHistoryMessage(readings: Reading[], now: Date): string {
+  const byGym = new Map<number, Reading[]>();
+  for (const reading of readings) {
+    byGym.set(reading.facilityId, [...(byGym.get(reading.facilityId) ?? []), reading]);
+  }
+
+  const charts: string[] = [];
+  let peak: { name: string; hour: number; percent: number } | null = null;
+
+  for (const [facilityId, gymReadings] of [...byGym.entries()].sort(([a], [b]) => a - b)) {
+    const buckets = bucketByHour(gymReadings);
+    if (buckets.length === 0) continue;
+
+    const name = GYM_NAMES[facilityId] ?? gymReadings[0].facilityName;
+    charts.push(`<b>${escapeHtml(name)}</b>\n<pre>${escapeHtml(chartFor(buckets))}</pre>`);
+
+    for (const bucket of buckets) {
+      if (!peak || bucket.percent > peak.percent) {
+        peak = { name, hour: bucket.startHour, percent: bucket.percent };
+      }
+    }
+  }
+
+  if (charts.length === 0) {
+    return [
+      "\u{1F4C8} <b>Today</b>",
+      "",
+      "No readings for today yet.",
+      `The gyms open at ${OPEN_HOUR}am.`,
+    ].join("\n");
+  }
+
+  const lines = ["\u{1F4C8} <b>Today</b>", "", ...charts];
+  if (peak) {
+    lines.push(
+      `Busiest so far: ${escapeHtml(peak.name)} at ${String(peak.hour).padStart(2, "0")}:00 (${Math.round(peak.percent)}%)`,
+    );
+  }
+  if (!isOpen(now)) {
+    lines.push("", CLOSED_NOTICE);
+  }
 
   return lines.join("\n").trim();
 }
@@ -196,27 +308,20 @@ export function formatGymMessage(readings: Reading[], now: Date): string {
 const ALERT_WINDOW_MINUTES = 12;
 
 export function shouldAlertOnFailure(lastSuccess: string | null, now: Date): boolean {
-  // Nothing has ever been collected: this is the first failure there has been.
   if (lastSuccess === null) return true;
-
-  const minutesSince = (now.getTime() - Date.parse(lastSuccess)) / 60000;
-  return minutesSince <= ALERT_WINDOW_MINUTES;
+  return (now.getTime() - Date.parse(lastSuccess)) / 60000 <= ALERT_WINDOW_MINUTES;
 }
 
-/**
- * The message sent to the operator when a collection run fails.
- *
- * Deliberately blunt: this is the only thing standing between a broken
- * collector and days of missing history nobody noticed.
- */
+/** The message sent to the operator when a collection run fails. */
 export function collectionFailedMessage(error: unknown, lastSuccess: string | null): string {
+  const detail = error instanceof Error ? error.message : String(error);
   return [
-    "\u{1F6A8} NUS Gym Tracker: collection failed",
+    "\u{1F6A8} <b>NUS Gym Tracker: collection failed</b>",
     "",
-    String(error instanceof Error ? error.message : error).slice(0, 300),
+    escapeHtml(detail.slice(0, 300)),
     "",
     lastSuccess
-      ? `Last successful collection: ${lastSuccess}`
+      ? `Last successful collection: ${escapeHtml(lastSuccess)}`
       : "There has never been a successful collection.",
   ].join("\n");
 }
@@ -224,65 +329,74 @@ export function collectionFailedMessage(error: unknown, lastSuccess: string | nu
 /** The reply to /start. */
 export function startMessage(): string {
   return [
-    "\u{1F3CB} Welcome to NUS Gym Tracker",
+    "\u{1F3CB} <b>Welcome to NUS Gym Tracker</b>",
     "",
     "Check how busy the NUS gyms are before you head down.",
     "",
-    "/gym - current crowd levels",
-    "/about - where the numbers come from",
-    "/help - all commands",
+    "/gym — current crowd levels",
+    "/history — how today has looked",
+    "/about — where the numbers come from",
+    "/help — all commands",
   ].join("\n");
 }
 
 /** The reply to /help. */
 export function helpMessage(): string {
   return [
-    "\u{1F3CB} NUS Gym Tracker",
+    HEADER,
     "",
-    "/gym - current crowd levels",
-    "/about - how the data is collected",
-    "/help - show commands",
-    "",
-    "Data comes from NUS REBOKS, sampled every 5 minutes while the gyms are open.",
+    "/gym — current crowd levels",
+    "/history — how today has looked",
+    "/about — how the data is collected",
+    "/help — show commands",
   ].join("\n");
 }
 
 /** The reply to /about. Everything the numbers do not say for themselves. */
 export function aboutMessage(): string {
   return [
-    "\u{1F3CB} NUS Gym Tracker",
+    HEADER,
     "",
-    `Readings come from the public NUS REBOKS capacity page, collected every 5 minutes while the gyms are open (${OPEN_HOUR}am-${CLOSE_HOUR - 12}pm daily).`,
+    `Gym occupancy is based on readings from the public NUS REBOKS capacity page, collected every 5 minutes while the gyms are open (${OPEN_HOUR}am–${CLOSE_HOUR - 12}pm).`,
     "",
-    "What the number is not:",
-    "Entry is by QR scan, and people often forget to scan out. The count is really 'scanned in and not yet scanned out', so it tends to read higher than the number of people actually in the gym.",
+    "<b>A note about the numbers</b>",
     "",
-    "A reading of 0 usually means closed rather than empty. The page gives no way to tell those apart.",
+    "The reported count is based on QR entry scans. Since people may forget to scan out, the number can be higher than the actual number of people in the gym.",
     "",
-    "Colour bands are our labels, not an NUS definition of busy:",
-    `\u{1F7E2} under ${MODERATE_PERCENT}%   \u{1F7E1} ${MODERATE_PERCENT}-${BUSY_PERCENT}%   \u{1F534} over ${BUSY_PERCENT}%`,
+    "A reading of <b>0</b> usually means the gym is closed, rather than completely empty.",
+    "",
+    "<b>How we label capacity</b>",
+    "",
+    `\u{1F7E2} <b>Under ${MODERATE_PERCENT}%</b> · Low`,
+    `\u{1F7E1} <b>${MODERATE_PERCENT}–${BUSY_PERCENT}%</b> · Moderate`,
+    `\u{1F534} <b>Over ${BUSY_PERCENT}%</b> · High`,
+    "",
+    "These are labels used by NUS Gym Tracker and are not official NUS capacity ratings.",
   ].join("\n");
 }
 
 /**
  * Send a message via the Telegram Bot API.
  *
- * Plain text, no parse_mode: Markdown would mean escaping every `-`, `.` and
- * `(` in the output, and buys nothing here.
+ * Never throws. Telegram retries any webhook we fail to answer, so letting an
+ * error escape here would mean the same update being delivered again and again
+ * - and the user getting the message twice once it eventually works.
  */
 export async function sendMessage(
   token: string,
   chatId: number,
   text: string,
 ): Promise<void> {
-  // Never throws. Telegram retries any webhook we fail to answer, so letting an
-  // error escape here would mean the same update being delivered again and
-  // again - and the user getting the message twice once it eventually works.
   try {
     const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text }),
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: "HTML",
+        link_preview_options: { is_disabled: true },
+      }),
     });
 
     if (!response.ok) {

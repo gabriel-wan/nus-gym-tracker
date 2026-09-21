@@ -15,14 +15,15 @@ Currently tracking:
 
 ## Status
 
-**Deployed and collecting. `/gym` works; the bot needs its webhook registered.**
+**Live and collecting every 5 minutes since 18 September 2026.**
 
 ```
 [x] Stage 0  Investigate REBOKS, build scraper
 [x] Stage 1  Cloudflare Worker
 [x] Stage 2  D1 storage + cron
 [x] Stage 3  Telegram /gym
-[ ] Stage 4  Historical analysis
+[x] Stage 4  Telegram /history
+[ ] Stage 5  Prediction, once there are weeks of data
 ```
 
 ## Run it

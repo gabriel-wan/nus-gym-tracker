@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { Reading } from "../src/db";
-import { formatGymMessage, parseCommand, shouldAlertOnFailure } from "../src/telegram";
+import {
+  bucketByHour,
+  escapeHtml,
+  formatGymMessage,
+  formatHistoryMessage,
+  parseCommand,
+  shouldAlertOnFailure,
+} from "../src/telegram";
 
 /** 13:00 UTC is 21:00 SGT, inside opening hours. */
 const EVENING = new Date("2026-09-18T13:00:00Z");
@@ -49,8 +56,8 @@ describe("formatGymMessage", () => {
   it("names the quieter gym", () => {
     const message = formatGymMessage([usc(22), utown(84)], EVENING);
 
-    expect(message).toContain("22 / 110 · 20% full");
-    expect(message).toContain("84 / 120 · 70% full");
+    expect(message).toContain("22 / 110 · 20%");
+    expect(message).toContain("84 / 120 · 70%");
     expect(message).toContain("USC Gym is quieter right now");
   });
 
@@ -62,15 +69,19 @@ describe("formatGymMessage", () => {
   it("does not call a gym quiet when it reads zero", () => {
     const message = formatGymMessage([usc(60), utown(0)], EVENING);
 
-    expect(message).toContain("closed or empty");
+    expect(message).toContain("⚪ 0 / 120");
     expect(message).toContain("Only USC Gym looks open");
     expect(message).not.toContain("UTown Gym is quieter");
   });
 
-  it("says closed outside opening hours rather than reporting 0%", () => {
-    const message = formatGymMessage([usc(0), utown(0)], NIGHT);
+  it("shows no numbers at all outside opening hours", () => {
+    // After 22:00 the REBOKS counter freezes on its last value, so any figure
+    // shown would be a leftover describing an empty building.
+    const message = formatGymMessage([usc(54), utown(92)], NIGHT);
 
     expect(message).toContain("closed");
+    expect(message).not.toContain("54");
+    expect(message).not.toContain("92");
     expect(message).not.toContain("quieter");
   });
 
@@ -98,6 +109,10 @@ describe("formatGymMessage", () => {
     expect(message).not.toContain("may be stuck");
   });
 
+  it("escapes HTML so a renamed facility cannot break the message", () => {
+    expect(escapeHtml('a <b> & "c"')).toBe('a &lt;b&gt; &amp; "c"');
+  });
+
   it("colours the bands: green under 40, amber to 70, red above", () => {
     expect(formatGymMessage([usc(22)], EVENING)).toContain("\u{1F7E2}");
     expect(formatGymMessage([usc(60)], EVENING)).toContain("\u{1F7E1}");
@@ -112,7 +127,7 @@ describe("formatGymMessage", () => {
   });
 
   it("always carries the scan caveat", () => {
-    expect(formatGymMessage([usc(40)], EVENING)).toContain("may read high");
+    expect(formatGymMessage([usc(40)], EVENING)).toContain("based on QR scans");
   });
 
   // Regression: the age line used to come from one row and be applied to both,
@@ -182,5 +197,70 @@ describe("shouldAlertOnFailure", () => {
     );
 
     expect(alerts).toEqual([5, 10]);
+  });
+});
+
+
+describe("bucketByHour", () => {
+  const at = (h: number, m = 0) =>
+    `2026-09-18T${String((h - 8 + 24) % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}:00Z`;
+
+  it("averages within a two-hour bucket", () => {
+    const buckets = bucketByHour([usc(11, at(7)), usc(33, at(8))]); // 10% and 30%
+
+    expect(buckets).toHaveLength(1);
+    expect(buckets[0].startHour).toBe(7);
+    expect(buckets[0].percent).toBeCloseTo(20, 5);
+  });
+
+  // The important one: after 22:00 the counter freezes, so those readings
+  // describe an empty building and must never reach a chart.
+  it("drops readings from after closing time", () => {
+    expect(bucketByHour([usc(61, at(22, 30)), usc(61, at(23, 30))])).toEqual([]);
+  });
+
+  it("drops readings from before opening time", () => {
+    expect(bucketByHour([usc(0, at(6, 30))])).toEqual([]);
+  });
+
+  it("keeps a reading from the last open hour", () => {
+    expect(bucketByHour([usc(55, at(21, 30))])).toHaveLength(1);
+  });
+
+  // Buckets anchor to opening time: the 07:00 readings must not be labelled
+  // 06:00, an hour when the gym is shut and every reading is a reset zero.
+  it("labels the first bucket 07:00, not 06:00", () => {
+    expect(bucketByHour([usc(20, at(7, 30))])[0].startHour).toBe(7);
+  });
+});
+
+describe("formatHistoryMessage", () => {
+  const at = (h: number) => `2026-09-18T${String((h - 8 + 24) % 24).padStart(2, "0")}:00:00Z`;
+  const EVENING_TODAY = new Date("2026-09-18T13:00:00Z");
+
+  it("draws a chart per gym inside a pre block so the bars line up", () => {
+    const message = formatHistoryMessage(
+      [usc(22, at(9)), usc(77, at(19)), utown(60, at(9))],
+      EVENING_TODAY,
+    );
+
+    expect(message).toContain("<pre>");
+    expect(message).toContain("USC Gym");
+    expect(message).toContain("UTown Gym");
+    expect(message).toMatch(/\u2588+\u2591*/);
+  });
+
+  it("names the busiest bucket across both gyms", () => {
+    const message = formatHistoryMessage([usc(22, at(9)), utown(108, at(19))], EVENING_TODAY);
+    expect(message).toContain("Busiest so far: UTown Gym at 19:00 (90%)");
+  });
+
+  it("explains an empty day rather than drawing nothing", () => {
+    expect(formatHistoryMessage([], EVENING_TODAY)).toContain("No readings for today yet");
+  });
+
+  it("builds a chart from only post-closing readings into nothing", () => {
+    const frozen = [usc(31, "2026-09-18T14:30:00Z"), usc(31, "2026-09-18T15:30:00Z")];
+    expect(formatHistoryMessage(frozen, EVENING_TODAY)).toContain("No readings for today yet");
   });
 });

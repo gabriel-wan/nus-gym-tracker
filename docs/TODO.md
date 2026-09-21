@@ -10,7 +10,7 @@
 - [x] Create a Cloudflare account, then `wrangler login`
 - [x] Deploy the Worker
 - [x] Register cron triggers (needed the workers.dev subdomain first)
-- [ ] Confirm the cron fires at 06:00 SGT
+- [x] Confirm the cron fires at 06:00 SGT
 
 ## Next
 - [x] D1 schema + first migration
@@ -23,8 +23,10 @@
 - [ ] Set ALERT_CHAT_ID so a broken collector is not silent
 
 ## Later
-- [ ] `/history` - recent trend, once a day of data exists
-- [ ] `/best` - quietest times, once there are weeks of data
+- [x] `/history` - today's shape for both gyms
+- [ ] `/best` - quietest times, needs ~4 weeks (no Tue/Wed/Thu data yet)
+- [ ] Retry once on a failed scrape - NUS returns an intermittent 525
+- [ ] Does UTown under-report scan-outs compared to USC?
 - [ ] Prediction, measured against a day-of-week/hour average baseline
 - [ ] Alerts
 
@@ -32,6 +34,6 @@
 - [x] Why did UTown read `0/120` all evening on 2026-09-17? Closed; reopens 18 Sep 2026
 - [ ] Are facility IDs stable over months?
 - [x] How does the counter work? QR scan at entry; exits often not scanned
-- [ ] Does the count reset at closing? (bracketed by the sampling window)
-- [ ] Does the count clamp at capacity? (watch for repeated exact-capacity readings)
+- [x] Does the count reset at closing? It freezes at 22:00, resets overnight
+- [x] Does the count clamp at capacity? No - max seen 94/120 and 85/110
 - [ ] Do the `facility/gymnumber` JSON endpoints ever come back? (re-test occasionally)

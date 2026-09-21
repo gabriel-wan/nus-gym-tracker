@@ -165,6 +165,44 @@ If the counter is capped at the published capacity, then `110/110` means "110 or
 and a full gym is indistinguishable from an overfull one. Frequent exact-capacity
 readings in the history would confirm it.
 
+### Confirmed by collected data: the counter freezes at closing
+
+Four days of 5-minute sampling settled this. At 22:00 the number stops changing
+entirely and holds its last value until an overnight reset. Saturday 19 September:
+
+```
+          UTown    USC
+21:00      65.3   40.0
+21:30      64.8   36.2
+22:00      61.0   31.0   <- closing
+22:30      61.0   31.0
+23:00      61.0   31.0
+23:30      61.0   31.0
+```
+
+Not one digit of variation across two hours. Every morning at 06:00 both gyms read
+exactly `0` again.
+
+So readings between 22:00 and 07:00 are **not measurements**. They are a leftover value
+describing an empty building, and there are 24 of them per gym per night - about 13% of
+a day's samples. Collecting them is worthwhile: the freeze is how we proved the reset,
+the frozen value is a free proxy for total daily visits, and a change to it would reveal
+extended opening hours. But they must never reach a chart or a model.
+
+The rule that follows: **collect 06:00-23:59, analyse 07:00-22:00.**
+
+### A difference between the two gyms, worth watching
+
+USC's count visibly ebbs and flows - it drops from 29 to 19 after lunch, and from 64 to
+53 after 19:00. People are scanning out and the counter registers it.
+
+UTown's count almost never falls during the day. It climbs from 0 to a plateau around 90
+and stays there.
+
+Four days is not enough to conclude anything, but if UTown's users scan out less than
+USC's, then the two numbers are not quite measuring the same thing, and comparing them as
+percentages is shakier than it looks. Worth revisiting once there are weeks of data.
+
 ### What this means for the bot
 
 Do not present the number as fact. `109/110` is *reported* occupancy, not "there are 109

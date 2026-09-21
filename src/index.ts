@@ -6,12 +6,18 @@
  *   fetch()     - HTTP, later the Telegram webhook
  */
 
-import { insertObservations, latestReadings, newestCollectedAt } from "./db";
+import {
+  insertObservations,
+  latestReadings,
+  newestCollectedAt,
+  readingsSince,
+} from "./db";
 import { observe, percentFull } from "./reboks";
 import {
   aboutMessage,
   collectionFailedMessage,
   formatGymMessage,
+  formatHistoryMessage,
   helpMessage,
   parseCommand,
   sendMessage,
@@ -131,6 +137,10 @@ async function replyTo(command: string, env: Env): Promise<string | null> {
   switch (command) {
     case "/gym":
       return formatGymMessage(await latestReadings(env.DB), new Date());
+    case "/history": {
+      const now = new Date();
+      return formatHistoryMessage(await readingsSince(env.DB, startOfSgtDay(now)), now);
+    }
     case "/start":
       return startMessage();
     case "/help":
@@ -165,4 +175,16 @@ async function reportCollectionFailure(env: Env, error: unknown): Promise<void> 
     // failed, and a crash here would hide the original error.
     console.error(`failed to report failure: ${alertError}`);
   }
+}
+
+/**
+ * Midnight Singapore time today, as a UTC timestamp.
+ *
+ * /history is "today" in the reader's terms, and a Singapore day starts 8 hours
+ * before the UTC one it overlaps.
+ */
+function startOfSgtDay(now: Date): string {
+  const sgt = new Date(now.getTime() + 8 * 3600_000);
+  const midnightSgt = Date.UTC(sgt.getUTCFullYear(), sgt.getUTCMonth(), sgt.getUTCDate());
+  return new Date(midnightSgt - 8 * 3600_000).toISOString();
 }
