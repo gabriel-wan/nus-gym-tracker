@@ -33,7 +33,7 @@ It is deliberately *not* called `observed_at`. There is no observation timestamp
 had: REBOKS renders a "Last Updated at" line, but it is the page render time and tracks
 the request clock second for second, so it says nothing about when the counter last
 changed. Storing it would be inventing precision. The gap between when a person scanned
-in and when we noticed is real, unknown, and bounded only by our 15-minute interval.
+in and when we noticed is real, unknown, and bounded only by our 5-minute interval.
 
 Stored as ISO-8601 text in **UTC**, e.g. `2026-09-17T13:13:15Z`. Text rather than an
 integer epoch because ISO-8601 sorts lexicographically in the same order it sorts

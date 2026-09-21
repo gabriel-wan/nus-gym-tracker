@@ -124,9 +124,21 @@ async function handleTelegramUpdate(request: Request, env: Env): Promise<Respons
     return new Response("ok");
   }
 
-  const reply = await replyTo(command, env);
-  if (reply !== null) {
-    await sendMessage(env.TELEGRAM_BOT_TOKEN, chatId, reply);
+  // A D1 failure inside replyTo must not escape. An unhandled throw answers
+  // Telegram with a 500, and Telegram redelivers that update again and again
+  // while the user sees nothing at all.
+  try {
+    const reply = await replyTo(command, env);
+    if (reply !== null) {
+      await sendMessage(env.TELEGRAM_BOT_TOKEN, chatId, reply);
+    }
+  } catch (error) {
+    console.error(`command ${command} failed: ${error}`);
+    await sendMessage(
+      env.TELEGRAM_BOT_TOKEN,
+      chatId,
+      "Something went wrong looking that up. Please try again in a moment.",
+    );
   }
 
   return new Response("ok");

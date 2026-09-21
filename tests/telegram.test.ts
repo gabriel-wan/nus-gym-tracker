@@ -238,13 +238,13 @@ describe("formatHistoryMessage", () => {
   const at = (h: number) => `2026-09-18T${String((h - 8 + 24) % 24).padStart(2, "0")}:00:00Z`;
   const EVENING_TODAY = new Date("2026-09-18T13:00:00Z");
 
-  it("draws a chart per gym inside a pre block so the bars line up", () => {
+  it("draws a chart per gym without code-block markup", () => {
     const message = formatHistoryMessage(
       [usc(22, at(9)), usc(77, at(19)), utown(60, at(9))],
       EVENING_TODAY,
     );
 
-    expect(message).toContain("<pre>");
+    expect(message).not.toContain("<pre>");
     expect(message).toContain("USC Gym");
     expect(message).toContain("UTown Gym");
     expect(message).toMatch(/\u2588+\u2591*/);
@@ -253,6 +253,16 @@ describe("formatHistoryMessage", () => {
   it("names the busiest bucket across both gyms", () => {
     const message = formatHistoryMessage([usc(22, at(9)), utown(108, at(19))], EVENING_TODAY);
     expect(message).toContain("Busiest so far: UTown Gym at 19:00 (90%)");
+  });
+
+  // /history answers "how has today looked". The closing notice belongs to
+  // /gym, where a missing current reading needs explaining.
+  it("does not repeat the closed notice", () => {
+    const NIGHT_TODAY = new Date("2026-09-18T17:00:00Z");
+    const message = formatHistoryMessage([usc(22, at(9))], NIGHT_TODAY);
+
+    expect(message).toContain("USC Gym");
+    expect(message).not.toContain("closed");
   });
 
   it("explains an empty day rather than drawing nothing", () => {

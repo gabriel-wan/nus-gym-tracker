@@ -262,7 +262,10 @@ export function formatHistoryMessage(readings: Reading[], now: Date): string {
     if (buckets.length === 0) continue;
 
     const name = GYM_NAMES[facilityId] ?? gymReadings[0].facilityName;
-    charts.push(`<b>${escapeHtml(name)}</b>\n<pre>${escapeHtml(chartFor(buckets))}</pre>`);
+    // No <pre>. The bars are block characters, uniform width in any font, so a
+    // code block buys alignment we do not need and makes a chart look like a
+    // dump of source.
+    charts.push(`<b>${escapeHtml(name)}</b>\n${escapeHtml(chartFor(buckets))}\n`);
 
     for (const bucket of buckets) {
       if (!peak || bucket.percent > peak.percent) {
@@ -286,10 +289,10 @@ export function formatHistoryMessage(readings: Reading[], now: Date): string {
       `Busiest so far: ${escapeHtml(peak.name)} at ${String(peak.hour).padStart(2, "0")}:00 (${Math.round(peak.percent)}%)`,
     );
   }
-  if (!isOpen(now)) {
-    lines.push("", CLOSED_NOTICE);
-  }
 
+  // No closing notice here. /history answers "how has today looked", and that
+  // reads the same whether the gym is open now or not. Explaining a missing
+  // current reading is /gym's job.
   return lines.join("\n").trim();
 }
 
