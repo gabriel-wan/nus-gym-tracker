@@ -280,10 +280,12 @@ export function formatHistoryMessage(readings: Reading[], now: Date): string {
     if (buckets.length === 0) continue;
 
     const name = GYM_NAMES[facilityId] ?? gymReadings[0].facilityName;
-    // No <pre>. The bars are block characters, uniform width in any font, so a
-    // code block buys alignment we do not need and makes a chart look like a
-    // dump of source.
-    charts.push(`<b>${escapeHtml(name)}</b>\n${escapeHtml(chartFor(buckets))}\n`);
+    // <pre> is the only way Telegram gives us a monospace font, and a chart is a
+    // table: columns line up only when every character is the same width. In the
+    // default proportional font `1` is narrower than `0`, so `11:00` is shorter
+    // than `07:00` and each row's bar starts somewhere slightly different. The
+    // gym name stays outside the block so the message still reads as a message.
+    charts.push(`<b>${escapeHtml(name)}</b>\n<pre>${escapeHtml(chartFor(buckets))}</pre>`);
 
     for (const bucket of buckets) {
       if (!peak || bucket.percent > peak.percent) {

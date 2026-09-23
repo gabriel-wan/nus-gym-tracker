@@ -238,13 +238,13 @@ describe("formatHistoryMessage", () => {
   const at = (h: number) => `2026-09-18T${String((h - 8 + 24) % 24).padStart(2, "0")}:00:00Z`;
   const EVENING_TODAY = new Date("2026-09-18T13:00:00Z");
 
-  it("draws a chart per gym without code-block markup", () => {
+  it("wraps each chart in a monospace block so the columns line up", () => {
     const message = formatHistoryMessage(
       [usc(22, at(9)), usc(77, at(19)), utown(60, at(9))],
       EVENING_TODAY,
     );
 
-    expect(message).not.toContain("<pre>");
+    expect(message).toContain("<pre>");
     expect(message).toContain("USC Gym");
     expect(message).toContain("UTown Gym");
     expect(message).toMatch(/\u2588+/);
