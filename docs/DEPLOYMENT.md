@@ -119,10 +119,14 @@ the one thing the tests cannot check. Rather than deploy and re-deploy to look a
 send the message to yourself through the real API:
 
 ```bash
-npm run preview history          # build today's chart and send it to yourself
-npm run preview gym              # the current-occupancy message
-npm run preview history --dry    # print it, send nothing
+npm run preview history             # build today's chart and print it
+npm run preview gym                 # the current-occupancy message
+npm run preview -- history --send   # also deliver it to yourself on Telegram
 ```
+
+Printing is the default and sending is opt-in. `npm run` silently drops flags it does
+not recognise - `npm run preview history --dry` loses `--dry` entirely - so the flag has
+to come after a `--`, and a flag that goes missing must fail towards *not* sending.
 
 It reads today's rows from the live database, runs them through the real formatters, and
 posts through the same `sendMessage` call the bot uses - so what arrives is what the bot

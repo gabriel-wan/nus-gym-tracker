@@ -6,9 +6,12 @@
  * message from the live database and sends it through the real API, so it can
  * be looked at before deploying.
  *
- *   node scripts/preview.mjs history
- *   node scripts/preview.mjs gym
- *   node scripts/preview.mjs history --dry     # print, do not send
+ *   npm run preview history              # print it
+ *   npm run preview -- history --send    # print it and send it to yourself
+ *
+ * Printing is the default and sending is opt-in, because `npm run` swallows
+ * unrecognised flags: `npm run preview history --dry` silently drops --dry. If
+ * a flag goes missing, not sending is the harmless outcome.
  *
  * Reads TELEGRAM_BOT_TOKEN and ALERT_CHAT_ID from .dev.vars (gitignored).
  */
@@ -87,7 +90,7 @@ const SELECT =
 
 async function main() {
   const command = process.argv[2] ?? "history";
-  const dryRun = process.argv.includes("--dry");
+  const send = process.argv.includes("--send");
 
   if (!["history", "gym"].includes(command)) {
     throw new Error(`Unknown command "${command}". Use history or gym.`);
@@ -110,7 +113,10 @@ async function main() {
 
   console.log(text);
 
-  if (dryRun) return;
+  if (!send) {
+    console.log("\n(not sent - run `npm run preview -- history --send` to deliver it)");
+    return;
+  }
 
   const vars = readDevVars();
   for (const key of ["TELEGRAM_BOT_TOKEN", "ALERT_CHAT_ID"]) {
