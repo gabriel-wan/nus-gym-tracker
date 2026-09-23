@@ -231,14 +231,32 @@ export function bucketByHour(readings: Reading[]): Bucket[] {
     .map(([startHour, { sum, count }]) => ({ startHour, percent: sum / count }));
 }
 
+/**
+ * Filled blocks only - no empty track.
+ *
+ * `█` and `░` are NOT the same width in Telegram's proportional font: the full
+ * block is wider, so a half-filled bar came out a different total length from an
+ * almost-empty one and everything after it sat at a different position. One
+ * repeated glyph cannot disagree with itself.
+ */
 function bar(percent: number): string {
-  const filled = Math.min(BAR_WIDTH, Math.max(0, Math.round((percent / 100) * BAR_WIDTH)));
-  return "█".repeat(filled) + "░".repeat(BAR_WIDTH - filled);
+  return "█".repeat(Math.min(BAR_WIDTH, Math.max(0, Math.round((percent / 100) * BAR_WIDTH))));
 }
 
+/**
+ * Time, then percentage, then the bar.
+ *
+ * The bar goes last on purpose. Bars have different lengths, so anything printed
+ * after one is pushed to a different position on every row - which is exactly
+ * how the percentages ended up ragged. Nothing follows the bar now.
+ */
 function chartFor(buckets: Bucket[]): string {
   return buckets
-    .map((b) => `${String(b.startHour).padStart(2, "0")}:00  ${bar(b.percent)}  ${String(Math.round(b.percent)).padStart(3)}%`)
+    .map((b) => {
+      const label = `${String(b.startHour).padStart(2, "0")}:00`;
+      const pct = `${String(Math.round(b.percent)).padStart(3)}%`;
+      return `${label}  ${pct}  ${bar(b.percent)}`;
+    })
     .join("\n");
 }
 

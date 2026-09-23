@@ -247,7 +247,10 @@ describe("formatHistoryMessage", () => {
     expect(message).not.toContain("<pre>");
     expect(message).toContain("USC Gym");
     expect(message).toContain("UTown Gym");
-    expect(message).toMatch(/\u2588+\u2591*/);
+    expect(message).toMatch(/\u2588+/);
+    // The empty-track glyph is gone: it is not the same width as the full block
+    // in Telegram's proportional font, which made every row a different length.
+    expect(message).not.toContain("\u2591");
   });
 
   it("names the busiest bucket across both gyms", () => {
