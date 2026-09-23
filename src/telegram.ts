@@ -40,8 +40,14 @@ const STALE_AFTER_MINUTES = 15;
 const BUSY_PERCENT = 70;
 const MODERATE_PERCENT = 40;
 
-/** Width of a /history bar, in characters. */
-const BAR_WIDTH = 10;
+/**
+ * Width of a /history bar, in characters.
+ *
+ * 16 gives a visible difference between 20% and 30% while keeping the whole
+ * line near 29 characters, which still fits a phone without the monospace block
+ * scrolling sideways. Raising this much further starts to wrap.
+ */
+const BAR_WIDTH = 16;
 
 /** Hours per /history bucket. Two keeps both gyms inside one readable message. */
 const BUCKET_HOURS = 2;
@@ -280,13 +286,14 @@ export function formatHistoryMessage(readings: Reading[], now: Date): string {
     if (buckets.length === 0) continue;
 
     const name = GYM_NAMES[facilityId] ?? gymReadings[0].facilityName;
-    // <pre> is the only way Telegram gives us a monospace font, and a chart is a
-    // table: columns line up only when every character is the same width. In the
-    // default proportional font `1` is narrower than `0`, so `11:00` is shorter
-    // than `07:00` and each row's bar starts somewhere slightly different. The
-    // gym name stays outside the block so the message still reads as a message.
+    // <code> rather than <pre>: both give the monospace a chart needs, because
+    // columns only line up when every character is one width - in the default
+    // proportional font `1` is narrower than `0`, so `11:00` is shorter than
+    // `07:00`. <pre> additionally renders as a code block with a copy button,
+    // which is wrong for a chart. The gym name stays outside so the message
+    // still reads as a message.
     // Trailing newline so the join leaves a blank line between the two gyms.
-    charts.push(`<b>${escapeHtml(name)}</b>\n<pre>${escapeHtml(chartFor(buckets))}</pre>\n`);
+    charts.push(`<b>${escapeHtml(name)}</b>\n<code>${escapeHtml(chartFor(buckets))}</code>\n`);
 
     for (const bucket of buckets) {
       if (!peak || bucket.percent > peak.percent) {
