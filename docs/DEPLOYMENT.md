@@ -61,12 +61,8 @@ Message [@userinfobot](https://t.me/userinfobot) on Telegram to find your own id
 this unset simply disables alerting; nothing else changes. It is worth setting: without
 it, a broken collector is silent, and lost history cannot be recovered later.
 
-For local development the same two names go in `.dev.vars`, which is gitignored:
-
-```
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_WEBHOOK_SECRET=...
-```
+For local development the same names go in `.dev.vars`, which is gitignored. Copy
+`.dev.vars.example` and fill it in. Wrangler reads it automatically for `npm run dev`.
 
 ### 5. Deploy
 
@@ -115,6 +111,29 @@ trying to deliver and failing.
 | `npm run typecheck` | TypeScript, no emit |
 | `npm run deploy` | publish to Cloudflare |
 | `npx wrangler tail` | live logs from the deployed Worker |
+
+## Previewing a message before deploying
+
+Whether a chart's columns line up depends on Telegram's font, not on our code, so it is
+the one thing the tests cannot check. Rather than deploy and re-deploy to look at it,
+send the message to yourself through the real API:
+
+```powershell
+.\scripts\preview.ps1 -File .\preview.txt
+```
+
+It reads `TELEGRAM_BOT_TOKEN` and `ALERT_CHAT_ID` from `.dev.vars`, so there is nothing
+to paste each time. The message arrives rendered exactly as the bot would send it,
+because it goes through the same `sendMessage` call with the same `parse_mode`.
+
+Two details the script exists to get right, both of which produced broken output when
+done by hand:
+
+- `Get-Content -Raw` does not return a plain string. PowerShell attaches `PSPath` and
+  related properties, and `ConvertTo-Json` then serialises all of them into the request
+  body. `[IO.File]::ReadAllText` returns a clean string.
+- PowerShell 5.1 reads a file with no byte-order mark using the system ANSI codepage, so
+  emoji and block characters arrive mangled unless UTF-8 is passed explicitly.
 
 ## Checking it is alive
 

@@ -1,0 +1,13 @@
+# Copy to .dev.vars and fill in real values. .dev.vars is gitignored.
+#
+# Wrangler reads this automatically for `npm run dev`, and scripts/preview.ps1
+# reads it to send message previews to yourself. The deployed Worker does not
+# use this file at all - production values live in Cloudflare via
+# `wrangler secret put`.
+
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_WEBHOOK_SECRET=
+
+# Your own Telegram user id, from @userinfobot. Used as the alert destination
+# and as the preview recipient.
+ALERT_CHAT_ID=
