@@ -285,7 +285,8 @@ export function formatHistoryMessage(readings: Reading[], now: Date): string {
     // default proportional font `1` is narrower than `0`, so `11:00` is shorter
     // than `07:00` and each row's bar starts somewhere slightly different. The
     // gym name stays outside the block so the message still reads as a message.
-    charts.push(`<b>${escapeHtml(name)}</b>\n<pre>${escapeHtml(chartFor(buckets))}</pre>`);
+    // Trailing newline so the join leaves a blank line between the two gyms.
+    charts.push(`<b>${escapeHtml(name)}</b>\n<pre>${escapeHtml(chartFor(buckets))}</pre>\n`);
 
     for (const bucket of buckets) {
       if (!peak || bucket.percent > peak.percent) {
