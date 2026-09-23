@@ -118,22 +118,24 @@ Whether a chart's columns line up depends on Telegram's font, not on our code, s
 the one thing the tests cannot check. Rather than deploy and re-deploy to look at it,
 send the message to yourself through the real API:
 
-```powershell
-.\scripts\preview.ps1 -File .\preview.txt
+```bash
+npm run preview history          # build today's chart and send it to yourself
+npm run preview gym              # the current-occupancy message
+npm run preview history --dry    # print it, send nothing
 ```
 
-It reads `TELEGRAM_BOT_TOKEN` and `ALERT_CHAT_ID` from `.dev.vars`, so there is nothing
-to paste each time. The message arrives rendered exactly as the bot would send it,
-because it goes through the same `sendMessage` call with the same `parse_mode`.
+It reads today's rows from the live database, runs them through the real formatters, and
+posts through the same `sendMessage` call the bot uses - so what arrives is what the bot
+would send. `TELEGRAM_BOT_TOKEN` and `ALERT_CHAT_ID` come from `.dev.vars`, so there is
+nothing to paste each time.
 
-Two details the script exists to get right, both of which produced broken output when
-done by hand:
+Two things the script has to work around:
 
-- `Get-Content -Raw` does not return a plain string. PowerShell attaches `PSPath` and
-  related properties, and `ConvertTo-Json` then serialises all of them into the request
-  body. `[IO.File]::ReadAllText` returns a clean string.
-- PowerShell 5.1 reads a file with no byte-order mark using the system ANSI codepage, so
-  emoji and block characters arrive mangled unless UTF-8 is passed explicitly.
+- Node 24 strips TypeScript types but will not resolve this project's extensionless
+  imports, so the formatters are bundled with esbuild and imported from memory. esbuild
+  comes in with wrangler rather than being a direct dependency - if a future wrangler
+  drops it, this script is the only thing that breaks.
+- `wrangler` rejects a `--command` containing newlines, so the query is one long line.
 
 ## Checking it is alive
 
